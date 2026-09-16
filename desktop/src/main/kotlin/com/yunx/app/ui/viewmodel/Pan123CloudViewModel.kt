@@ -552,15 +552,13 @@ class Pan123CloudViewModel(
     /** 下拉刷新 */
     fun refresh() {
         val current = uiState.value
-        if (current !is Pan123CloudUiState.Loaded) {
-            loadRoot()
-            return
-        }
+        val dirId = (current as? Pan123CloudUiState.Loaded)?.dirId ?: "0"
+        val pathNames = (current as? Pan123CloudUiState.Loaded)?.pathNames ?: emptyList()
         refreshing = true
         viewModelScope.launch {
             try {
-                val files = api.listCloudFiles(current.dirId, token()).first
-                _uiState.value = Pan123CloudUiState.Loaded(files, current.pathNames, current.dirId)
+                val files = api.listCloudFiles(dirId, token()).first
+                _uiState.value = Pan123CloudUiState.Loaded(files, pathNames, dirId)
             } catch (e: Exception) {
                 cloudMessage = e.message ?: "刷新失败"
             } finally {
@@ -581,12 +579,18 @@ class Pan123CloudViewModel(
     private fun load(dirId: String, pathNames: List<String>) {
         _uiState.value = Pan123CloudUiState.Loading
         viewModelScope.launch {
-            try {
-                val files = api.listCloudFiles(dirId, token()).first
-                _uiState.value = Pan123CloudUiState.Loaded(files, pathNames, dirId)
-            } catch (e: Exception) {
-                _uiState.value = Pan123CloudUiState.Error(e.message ?: "加载失败")
+            var lastError: Exception? = null
+            repeat(2) { attempt ->
+                try {
+                    val files = api.listCloudFiles(dirId, token()).first
+                    _uiState.value = Pan123CloudUiState.Loaded(files, pathNames, dirId)
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    if (attempt < 1) kotlinx.coroutines.delay(500)
+                }
             }
+            _uiState.value = Pan123CloudUiState.Error(lastError?.message ?: "加载失败")
         }
     }
 

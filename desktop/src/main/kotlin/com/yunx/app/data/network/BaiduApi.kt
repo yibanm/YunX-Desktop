@@ -373,7 +373,12 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
             .build()
         runCatching {
             val json = executeJson(request)
-            if (json.optInt("errno") != 0) return@runCatching emptyList()
+            val errno = json.optInt("errno")
+            if (errno != 0) {
+                // 错误码不静默吞掉：抛异常让 ViewModel 进入 Error 态并可重试，
+                // 避免把「登录态失效/接口限流」误判为「此目录为空」
+                throw IllegalStateException("百度网盘接口错误 (errno=$errno)")
+            }
             val array = json.optJSONArray("list") ?: return@runCatching emptyList()
             buildList {
                 for (i in 0 until array.length()) {
@@ -391,7 +396,7 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
                     )
                 }
             }
-        }.getOrDefault(emptyList())
+        }.getOrElse { throw it }
     }
 
     /** 重命名（filemanager opera=rename，按完整路径） */

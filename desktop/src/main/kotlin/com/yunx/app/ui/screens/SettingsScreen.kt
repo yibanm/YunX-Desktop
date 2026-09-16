@@ -448,7 +448,8 @@ fun SettingsScreen(
                                 tagName = "v1.2.4（预览）",
                                 body = "这是调试预览弹窗，用于查看更新弹窗 UI（含镜像站下载按钮）。",
                                 assets = emptyList(),
-                                publishedAt = ""
+                                publishedAt = "",
+                                htmlUrl = ""
                             )
                         }
                     },

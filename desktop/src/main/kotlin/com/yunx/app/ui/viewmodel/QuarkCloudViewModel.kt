@@ -661,20 +661,19 @@ class QuarkCloudViewModel(
     /** 下拉刷新当前目录（不切 Loading 遮罩，完成后更新列表） */
     fun refresh() {
         val current = uiState.value
-        if (current !is QuarkCloudUiState.Loaded) {
-            loadRoot()
-            return
-        }
+        val dirFid = (current as? QuarkCloudUiState.Loaded)?.dirFid ?: ""
+        val pathNames = (current as? QuarkCloudUiState.Loaded)?.pathNames ?: emptyList()
         refreshing = true
         viewModelScope.launch {
             val cookie = cookieProvider()
             if (cookie.isNullOrBlank()) {
                 refreshing = false
+                cloudMessage = "请先登录夸克网盘"
                 return@launch
             }
             try {
-                val files = api.listCloudFiles(current.dirFid, cookie) ?: emptyList()
-                _uiState.value = QuarkCloudUiState.Loaded(files, current.pathNames, current.dirFid)
+                val files = api.listCloudFiles(dirFid, cookie) ?: emptyList()
+                _uiState.value = QuarkCloudUiState.Loaded(files, pathNames, dirFid)
             } catch (e: Exception) {
                 cloudMessage = e.message ?: "刷新失败"
             } finally {
@@ -700,12 +699,18 @@ class QuarkCloudViewModel(
                 _uiState.value = QuarkCloudUiState.Error("请先登录夸克网盘")
                 return@launch
             }
-            try {
-                val files = api.listCloudFiles(dirFid, cookie) ?: emptyList()
-                _uiState.value = QuarkCloudUiState.Loaded(files, pathNames, dirFid)
-            } catch (e: Exception) {
-                _uiState.value = QuarkCloudUiState.Error(e.message ?: "加载失败")
+            var lastError: Exception? = null
+            repeat(2) { attempt ->
+                try {
+                    val files = api.listCloudFiles(dirFid, cookie) ?: emptyList()
+                    _uiState.value = QuarkCloudUiState.Loaded(files, pathNames, dirFid)
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    if (attempt < 1) kotlinx.coroutines.delay(500)
+                }
             }
+            _uiState.value = QuarkCloudUiState.Error(lastError?.message ?: "加载失败")
         }
     }
 

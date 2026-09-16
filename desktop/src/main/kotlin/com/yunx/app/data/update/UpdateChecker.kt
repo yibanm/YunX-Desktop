@@ -30,7 +30,8 @@ object UpdateChecker {
         val tagName: String,
         val body: String,
         val assets: List<Asset>,
-        val publishedAt: String
+        val publishedAt: String,
+        val htmlUrl: String
     )
 
     /** 比较两个版本号：v1 > v2 返回正数，v1 < v2 返回负数，相等返回 0 */
@@ -82,7 +83,8 @@ object UpdateChecker {
                 tagName = tag,
                 body = json.optString("body"),
                 assets = assets,
-                publishedAt = json.optString("published_at")
+                publishedAt = json.optString("published_at"),
+                htmlUrl = json.optString("html_url")
             )
         }.getOrNull()
     }

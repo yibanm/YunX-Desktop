@@ -1,6 +1,7 @@
 package com.yunx.app.ui.screens
 
 import com.yunx.app.ui.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -154,42 +156,33 @@ fun SupportScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "微信扫码捐赠",
+                            text = "扫码赞赏支持",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 捐赠码占位（桌面版不内嵌二维码图片资源）
-                    Surface(
-                        modifier = Modifier.size(160.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest
+                    // 两个赞赏码并排：原作者 + 维护者
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Favorite,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "微信捐赠码",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        RewardCodeCard(
+                            imageRes = "reward_author.jpg",
+                            title = "原作者 CYQawa",
+                            subtitle = "微信赞赏码"
+                        )
+                        RewardCodeCard(
+                            imageRes = "reward_user.png",
+                            title = "维护者 richkobe",
+                            subtitle = "支付宝赞赏码"
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "桌面版暂不提供二维码图片，可通过下方开源仓库入口支持项目开发",
+                        text = "你的每一份支持，都是持续维护与更新的动力",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -241,7 +234,7 @@ fun SupportScreen(
             // ---------- 开源仓库入口 ----------
             Button(
                 onClick = {
-                    DesktopActions.openUrl("https://github.com/CYQawa/YunX")
+                    DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop")
                     SnackbarController.show("已打开开源仓库页面")
                 },
                 modifier = Modifier
@@ -257,5 +250,43 @@ fun SupportScreen(
                 Text("前往 GitHub 支持")
             }
         }
+    }
+}
+
+/** 赞赏码卡片：二维码图片 + 标题 + 副标题 */
+@Composable
+private fun RewardCodeCard(
+    imageRes: String,
+    title: String,
+    subtitle: String
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(140.dp)
+    ) {
+        Surface(
+            modifier = Modifier.size(140.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest
+        ) {
+            Image(
+                painter = painterResource(imageRes),
+                contentDescription = title,
+                modifier = Modifier.padding(8.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
