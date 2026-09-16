@@ -1066,20 +1066,20 @@ class DownloadManager(
     /** 分片临时文件目录：cacheBase()/download_tmp/$id */
     private fun chunkDirOf(id: Long): File = File(cacheBase(), "download_tmp/$id")
 
-    /** 分片数规划（任务池模型）：分片数 = 线程数 × 8，远多于并发线程数。
+    /** 分片数规划（任务池模型）：分片数 = 线程数 × 3。
      *  worker 循环领取盈余块，任一分片慢时其他线程继续领新片，根治"尾部并发塌缩"；
-     *  保留 1MB 单片下限（避免过多小片）与 512 封顶。 */
+     *  最小单片 4MB（避免过多小分片频繁建连，"开始快后面慢"的根因），512 封顶。 */
     private fun chunkCountFor(total: Long, threads: Int): Int {
         if (total <= 0) return 1
-        val minChunkBytes = 1 * 1024 * 1024L
+        val minChunkBytes = 4 * 1024 * 1024L
         val bySize = when {
-            total < 5 * 1024 * 1024 -> 1          // < 5MB 不分片
-            total < 50 * 1024 * 1024 -> 8         // < 50MB
-            total < 500 * 1024 * 1024 -> 32       // < 500MB
-            else -> 64                            // ≥ 500MB 基础值
+            total < 20 * 1024 * 1024 -> 1          // < 20MB 不分片
+            total < 100 * 1024 * 1024 -> 8         // < 100MB
+            total < 500 * 1024 * 1024 -> 16        // < 500MB
+            else -> 32                             // ≥ 500MB 基础值
         }
-        // 任务池：每线程平均领 8 片，天然抗慢片拖尾（比 1:1 映射多 8 倍盈余）
-        val want = maxOf(bySize, threads * 8)
+        // 任务池：每线程平均领 3 片，单片体积更大，减少建连开销
+        val want = maxOf(bySize, threads * 3)
         return minOf(want, (total / minChunkBytes).toInt().coerceAtLeast(1), 512)
     }
 }

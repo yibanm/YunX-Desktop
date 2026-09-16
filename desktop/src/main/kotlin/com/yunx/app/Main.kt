@@ -7,6 +7,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import com.yunx.app.data.network.XunleiDeviceFingerprint
+import com.yunx.app.data.prefs.SettingsRepository
 import com.yunx.app.ui.MainScreen
 import com.yunx.app.ui.jcef.JcefHolder
 import com.yunx.app.ui.theme.ComposeEmptyActivityTheme
@@ -26,8 +27,15 @@ fun main(args: Array<String>) {
         )
     }
 
+    // Windows AppUserModelID：必须在窗口创建前设置，任务栏右键才显示"固定到任务栏/结束任务"
+    com.yunx.app.util.WindowsAppUserModelId.init()
+
     // 桌面上下文初始化（数据目录等）
     AppContext.init()
+    // 应用自定义缓存目录（设置页配置的下载缓存位置；为空则用默认 ~/.yunx-pc/cache）
+    SettingsRepository().downloadCacheDir?.let {
+        AppContext.customCacheDir = it
+    }
     // 迅雷设备指纹（进程启动时初始化一次，等价原 Application.onCreate）
     XunleiDeviceFingerprint.init()
 
@@ -66,7 +74,7 @@ fun main(args: Array<String>) {
                 if (w != null) WindowFx.fadeOutThen(w) { exitApplication() }
                 else exitApplication()
             },
-            title = "云析 YunX-Desktop",
+            title = "云析 YunX-Desktop-Fork",
             state = WindowState(size = DpSize(1100.dp, 760.dp)),
             icon = remember { loadWindowIcon() },
         ) {

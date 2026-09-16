@@ -9,8 +9,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import kotlin.reflect.KClass
+import com.yunx.app.data.db.AppDatabase
 import com.yunx.app.data.db.BookmarkDao
 import com.yunx.app.data.db.BookmarkEntity
+import com.yunx.app.data.db.LinkHistoryEntity
 import com.yunx.app.data.download.DownloadManager
 import com.yunx.app.data.download.DownloadPlatform
 import com.yunx.app.data.network.BaiduConstants
@@ -39,6 +41,7 @@ import com.yunx.app.data.repository.UCResolveRepository
 import com.yunx.app.data.repository.XunleiAccountRepository
 import com.yunx.app.data.repository.XunleiResolveRepository
 import com.yunx.app.ui.SnackbarController
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -537,11 +540,32 @@ class ResolveViewModel(
                     currentDirFid = currentDefaultDirFid()
                     dirStack.clear()
                     pathNames = emptyList()
+                    // 成功解析后自动记录到链接历史（同 url 1 小时内去重）
+                    recordLinkHistory(s.title)
                     loadFiles(s, currentDirFid, credential, repo)
                 }
                 .onFailure { e ->
                     uiState = ResolveUiState.Error(e.message ?: "解析失败")
                 }
+        }
+    }
+
+    /**
+     * 成功解析后自动记录到链接历史（link_history 表）。
+     * 去重：同一 url 最近 1 小时内已记录则不重复插入；记录失败不影响解析流程。
+     */
+    private suspend fun recordLinkHistory(title: String) {
+        val link = currentLink?.takeIf { it.isNotBlank() } ?: return
+        val pwd = currentPwd.orEmpty()
+        val platform = currentPlatform.name
+        runCatching {
+            val dao = AppDatabase.get().linkHistoryDao()
+            val oneHourAgo = System.currentTimeMillis() - 3600_000L
+            val duplicated = dao.search(link).first().any { it.url == link && it.createTime >= oneHourAgo }
+            if (duplicated) return@runCatching
+            dao.insert(
+                LinkHistoryEntity(url = link, title = title, platform = platform, pwd = pwd)
+            )
         }
     }
 

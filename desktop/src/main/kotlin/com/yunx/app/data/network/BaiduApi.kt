@@ -3,6 +3,7 @@ package com.yunx.app.data.network
 import com.yunx.app.data.network.model.QuotaInfo
 import com.yunx.app.data.network.model.ShareFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -532,12 +533,29 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
 
     // ---------- 公共 ----------
 
-    private fun executeJson(request: Request): JSONObject {
-        val response = client.newCall(request).execute()
-        val body = response.use { it.body?.string() ?: throw BaiduApiException("请求失败：响应为空") }
-        return runCatching { JSONObject(body) }.getOrElse {
-            throw BaiduApiException("响应解析失败")
+    /**
+     * 执行请求并解析 JSON。
+     * 针对百度风控/频率限制 errno=8888：等待 2 秒后自动重试，最多重试 3 次（共 4 次尝试）；
+     * 其它 errno 原样返回，仍由调用方 checkErrno 抛异常。
+     */
+    private suspend fun executeJson(request: Request): JSONObject {
+        var last: JSONObject? = null
+        // 1 次首试 + 最多 3 次重试
+        repeat(4) { attempt ->
+            val response = client.newCall(request).execute()
+            val body = response.use { it.body?.string() ?: throw BaiduApiException("请求失败：响应为空") }
+            val json = runCatching { JSONObject(body) }.getOrElse {
+                throw BaiduApiException("响应解析失败")
+            }
+            last = json
+            // errno=8888 为百度风控/频率限制，等待后通常恢复；非末次尝试时延迟 2s 重试
+            if (json.optInt("errno") == 8888 && attempt < 3) {
+                delay(2000)
+                return@repeat
+            }
+            return json
         }
+        return last ?: throw BaiduApiException("响应解析失败")
     }
 
     private fun checkErrno(json: JSONObject, fallback: String) {

@@ -13,14 +13,18 @@ object AppContext {
     val dataDir: File = System.getenv("YUNX_PC_DATA_DIR")?.let { File(it) }
         ?: File(System.getProperty("user.home"), ".yunx-pc")
 
-    /** 缓存目录（下载分片等可丢弃数据） */
-    val cacheDir: File = File(dataDir, "cache")
+    /** 运行时自定义缓存目录（由设置页注入；null = 使用默认 cacheDir，修改后重启生效） */
+    @Volatile
+    var customCacheDir: String? = null
+
+    /** 缓存目录（下载分片等可丢弃数据）；可被 [customCacheDir] 覆盖 */
+    val cacheDir: File get() = customCacheDir?.let { File(it) } ?: File(dataDir, "cache")
 
     /** 下载分片目录（原 externalCacheDir/download_tmp） */
-    val downloadTmpDir: File = File(cacheDir, "download_tmp")
+    val downloadTmpDir: File get() = File(cacheDir, "download_tmp")
 
     /** 合并暂存目录（原 cacheDir/merged_*） */
-    val mergeDir: File = File(cacheDir, "merge")
+    val mergeDir: File get() = File(cacheDir, "merge")
 
     /** 杂项文件目录（日志等） */
     val filesDir: File = File(dataDir, "files")

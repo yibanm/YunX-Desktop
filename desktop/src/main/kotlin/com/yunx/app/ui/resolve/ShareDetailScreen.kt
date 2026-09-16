@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.MoreVert
@@ -122,6 +123,8 @@ fun ShareDetailScreen(
     var pendingBaiduAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     // 「添加至收藏」弹窗
     var showAddBookmark by remember { mutableStateOf(false) }
+    // 「链接历史」弹窗
+    var showLinkHistory by remember { mutableStateOf(false) }
 
     /** 百度分享下载前检查：>300MB 且未忽略时弹提示，确认后执行 */
     fun checkBaiduLimit(file: ShareFile, proceed: () -> Unit) {
@@ -188,6 +191,13 @@ fun ShareDetailScreen(
                                     text = "共 ${files.size} 项",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { showLinkHistory = true }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.History,
+                                    contentDescription = "链接历史",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             IconButton(onClick = { showAddBookmark = true }) {
@@ -379,6 +389,16 @@ fun ShareDetailScreen(
             onDismiss = { showAddBookmark = false }
         )
     }
+
+    // 链接历史弹窗：选择某条历史后用 ViewModel 重新解析
+    LinkHistoryDialog(
+        visible = showLinkHistory,
+        onDismiss = { showLinkHistory = false },
+        onSelect = { url, pwd ->
+            showLinkHistory = false
+            viewModel.startResolve(url, pwd.ifBlank { null })
+        }
+    )
 
     // 转存弹窗：浏览网盘目录并保存（单文件转存；夸克/迅雷/百度按平台选目录选择器）
     if (viewModel.saveTarget != null) {

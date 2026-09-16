@@ -33,6 +33,7 @@ class AppDatabase private constructor(private val conn: Connection) {
     private val rawPan123 = JdbcPan123AccountDao(conn)
     private val rawDownloadTask = JdbcDownloadTaskDao(conn)
     private val rawBookmark = JdbcBookmarkDao(conn)
+    private val rawLinkHistory = JdbcLinkHistoryDao(conn)
 
     fun quarkAccountDao(): QuarkAccountDao = SecureAccountDaos.quark(rawQuark, credentialCipher)
     fun ucAccountDao(): UCAccountDao = SecureAccountDaos.uc(rawUc, credentialCipher)
@@ -42,6 +43,7 @@ class AppDatabase private constructor(private val conn: Connection) {
     fun pan123AccountDao(): Pan123AccountDao = SecureAccountDaos.pan123(rawPan123, credentialCipher)
     fun downloadTaskDao(): DownloadTaskDao = rawDownloadTask
     fun bookmarkDao(): BookmarkDao = rawBookmark
+    fun linkHistoryDao(): LinkHistoryDao = rawLinkHistory
 
     companion object {
         private const val TAG = "YunX-DB"
@@ -112,7 +114,8 @@ class AppDatabase private constructor(private val conn: Connection) {
             "CREATE TABLE IF NOT EXISTS c139_account (id TEXT PRIMARY KEY NOT NULL, cookie TEXT NOT NULL, nickname TEXT NOT NULL, authorization TEXT NOT NULL, updatedAt INTEGER NOT NULL)",
             "CREATE TABLE IF NOT EXISTS pan123_account (id TEXT PRIMARY KEY NOT NULL, accessToken TEXT NOT NULL, account TEXT NOT NULL, nickname TEXT NOT NULL, updatedAt INTEGER NOT NULL)",
             "CREATE TABLE IF NOT EXISTS download_task (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, fileName TEXT NOT NULL, totalSize INTEGER NOT NULL, downloadedSize INTEGER NOT NULL, status INTEGER NOT NULL, errorMsg TEXT NOT NULL, savePath TEXT NOT NULL, requestHeadersJson TEXT NOT NULL DEFAULT '{}', chunkCount INTEGER NOT NULL DEFAULT 0, plannedTotalSize INTEGER NOT NULL DEFAULT 0, cleanupId TEXT NOT NULL DEFAULT '', platform TEXT NOT NULL DEFAULT '', avgSpeed INTEGER NOT NULL DEFAULT 0, createTime INTEGER NOT NULL)",
-            "CREATE TABLE IF NOT EXISTS bookmark (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, link TEXT NOT NULL, title TEXT NOT NULL, platform TEXT NOT NULL, pwd TEXT NOT NULL, category TEXT NOT NULL, createTime INTEGER NOT NULL)"
+            "CREATE TABLE IF NOT EXISTS bookmark (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, link TEXT NOT NULL, title TEXT NOT NULL, platform TEXT NOT NULL, pwd TEXT NOT NULL, category TEXT NOT NULL, createTime INTEGER NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS link_history (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, url TEXT NOT NULL, title TEXT NOT NULL, platform TEXT NOT NULL, pwd TEXT NOT NULL, createTime INTEGER NOT NULL)"
         )
     }
 }
@@ -530,6 +533,86 @@ private class JdbcBookmarkDao(private val conn: Connection) : BookmarkDao {
                 ps.setLong(1, id)
                 ps.executeUpdate()
             }
+        }
+        reload()
+    }
+}
+
+private class JdbcLinkHistoryDao(private val conn: Connection) : LinkHistoryDao {
+
+    private val _history = MutableStateFlow<List<LinkHistoryEntity>>(emptyList())
+
+    init {
+        _history.value = loadAll()
+    }
+
+    private fun loadAll(): List<LinkHistoryEntity> = synchronized(conn) {
+        conn.prepareStatement("SELECT * FROM link_history ORDER BY createTime DESC").use { ps ->
+            ps.executeQuery().use { rs ->
+                val out = mutableListOf<LinkHistoryEntity>()
+                while (rs.next()) {
+                    out += LinkHistoryEntity(
+                        id = rs.getLong("id"),
+                        url = rs.getString("url"),
+                        title = rs.getString("title"),
+                        platform = rs.getString("platform"),
+                        pwd = rs.getString("pwd"),
+                        createTime = rs.getLong("createTime")
+                    )
+                }
+                out
+            }
+        }
+    }
+
+    private fun reload() {
+        _history.value = loadAll()
+    }
+
+    override fun observeAll(): Flow<List<LinkHistoryEntity>> = _history
+
+    override fun search(query: String): Flow<List<LinkHistoryEntity>> {
+        val q = query.trim()
+        if (q.isEmpty()) return _history
+        return _history.map { list ->
+            list.filter {
+                it.url.contains(q, ignoreCase = true) ||
+                    it.title.contains(q, ignoreCase = true) ||
+                    it.platform.contains(q, ignoreCase = true)
+            }
+        }
+    }
+
+    override suspend fun insert(entity: LinkHistoryEntity): Long = dbIo {
+        synchronized(conn) {
+            conn.prepareStatement(
+                "INSERT INTO link_history(url,title,platform,pwd,createTime) VALUES(?,?,?,?,?)",
+                Statement.RETURN_GENERATED_KEYS
+            ).use { ps ->
+                ps.setString(1, entity.url)
+                ps.setString(2, entity.title)
+                ps.setString(3, entity.platform)
+                ps.setString(4, entity.pwd)
+                ps.setLong(5, entity.createTime)
+                ps.executeUpdate()
+                ps.generatedKeys.use { gk -> if (gk.next()) gk.getLong(1) else entity.id }
+            }
+        }.also { reload() }
+    }
+
+    override suspend fun delete(id: Long) = dbIo {
+        synchronized(conn) {
+            conn.prepareStatement("DELETE FROM link_history WHERE id = ?").use { ps ->
+                ps.setLong(1, id)
+                ps.executeUpdate()
+            }
+        }
+        reload()
+    }
+
+    override suspend fun clear() = dbIo {
+        synchronized(conn) {
+            conn.prepareStatement("DELETE FROM link_history").use { it.executeUpdate() }
         }
         reload()
     }
