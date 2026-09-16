@@ -71,6 +71,9 @@ import com.yunx.app.data.repository.UCResolveRepository
 import com.yunx.app.data.repository.XunleiAccountRepository
 import com.yunx.app.data.repository.XunleiResolveRepository
 import com.yunx.app.ui.components.OverlayDialogHost
+import com.yunx.app.ui.clipboard.ClipboardLinkController
+import com.yunx.app.ui.clipboard.ClipboardLinkDetector
+import com.yunx.app.ui.clipboard.ClipboardLinkPopup
 import com.yunx.app.ui.login.BaiduLoginScreen
 import com.yunx.app.ui.login.C139LoginScreen
 import com.yunx.app.ui.login.Pan123LoginScreen
@@ -329,6 +332,25 @@ fun MainScreen() {
     val baiduAccount by baiduViewModel.baiduAccount.collectAsState()
     val c139Account by c139ViewModel.c139Account.collectAsState()
     val pan123Account by pan123ViewModel.pan123Account.collectAsState()
+
+    // 剪贴板检测：主窗口失焦时识别到网盘分享链接 → 右下角弹窗（覆盖所有网盘平台）。
+    // 必须放在全屏覆盖层 return 之前，保证任何页面状态下监听都在运行。
+    ClipboardLinkDetector()
+    ClipboardLinkPopup()
+    // 弹窗点击「打开」：切到解析页并解析，同时把主窗口置前
+    val clipboardOpenRequest = ClipboardLinkController.openRequest
+    LaunchedEffect(clipboardOpenRequest) {
+        val d = ClipboardLinkController.consumeOpen() ?: return@LaunchedEffect
+        currentTab = MainTab.Resolve
+        resolveViewModel.startResolve(d.text, d.parsed.pwd)
+        ClipboardLinkController.mainWindow?.let { w ->
+            runCatching {
+                if (!w.isVisible) w.isVisible = true
+                if (w.state != java.awt.Frame.NORMAL) w.state = java.awt.Frame.NORMAL
+                w.toFront()
+            }
+        }
+    }
 
     // 解析页发起下载后，自动切换到「下载」Tab
     LaunchedEffect(resolveViewModel.downloadStarted) {

@@ -36,7 +36,7 @@
 要求：Windows 10/11 x64。零手动环境配置 —— 缺 JDK 自动下载（`jdk-setup.ps1`），Gradle 发行版由 wrapper 自动拉取，Inno Setup 6 缺失时安装器脚本会自动下载并静默安装。
 
 ```powershell
-git clone https://github.com/tidain/YunX-Desktop.git
+git clone https://github.com/yibanm/YunX-Desktop.git
 cd YunX-Desktop
 
 .\run.ps1 run        # 编译并启动（开发）

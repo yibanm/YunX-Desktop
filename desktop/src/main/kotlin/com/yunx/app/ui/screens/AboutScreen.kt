@@ -464,7 +464,7 @@ private fun CardIcon(icon: ImageVector) {
 private fun GitHubCard() {
     Card(
         onClick = {
-            DesktopActions.openUrl("https://github.com/CYQawa/YunX")
+            DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop")
         },
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -500,7 +500,7 @@ private fun GitHubCard() {
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "github.com/CYQawa/YunX-Desktop",
+                    text = "github.com/yibanm/YunX-Desktop",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -72,6 +72,8 @@ fun main(args: Array<String>) {
         ) {
             androidx.compose.runtime.SideEffect {
                 mainWindow = window as? java.awt.Frame
+                // 剪贴板弹窗需要判断主窗口是否失焦、以及「打开」时把窗口置前
+                com.yunx.app.ui.clipboard.ClipboardLinkController.mainWindow = mainWindow
             }
             // 窗口出现后再后台启动 JCEF，登录页通过 browserReady 状态自动切换
             androidx.compose.runtime.LaunchedEffect(Unit) {

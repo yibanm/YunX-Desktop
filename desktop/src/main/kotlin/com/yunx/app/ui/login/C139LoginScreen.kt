@@ -13,6 +13,10 @@ import com.yunx.app.ui.viewmodel.C139AccountViewModel
 /**
  * 139 网盘（和彩云）登录页：内嵌浏览器优先，粘贴/自动导入兜底。
  * Cookie 需包含 Os_SSo_Sid 与 RMKEY（或 authorization=）。
+ *
+ * 网页版登录（yun.139.com）目前只下发 authorization，不会写 Os_SSo_Sid/RMKEY，
+ * 所以检测条件改为「双键齐全」或「authorization 存在」任一成立，否则保存登录态
+ * 按钮永不出现，登录了也没有效果。
  */
 @Composable
 fun C139LoginScreen(
@@ -28,6 +32,7 @@ fun C139LoginScreen(
             loginUrl = C139Constants.LOGIN_URL,
             domains = listOf("mail.10086.cn", "yun.139.com", ".10086.cn"),
             requiredKeys = listOf("Os_SSo_Sid", "RMKEY"),
+            anyOfKeys = listOf("authorization"),
             platform = "C139",
             onSave = { cookie -> viewModel.saveC139Account(cookie) },
             onBack = onBack,

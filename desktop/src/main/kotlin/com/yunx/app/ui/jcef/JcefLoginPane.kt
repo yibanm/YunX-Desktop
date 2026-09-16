@@ -63,6 +63,11 @@ private const val TAG = "YunX-JCEF-UI"
  * - SwingPanel 嵌入真实 Chromium（JCEF），加载网盘登录页；
  * - 每 1.5 秒轮询全局 Cookie，检测到必需键后提示「已检测到登录态」，一键保存；
  * - 底部提供「自动导入浏览器 Cookie」（方案 A）与「手动粘贴」备选。
+ *
+ * @param requiredKeys 必须全部存在的 Cookie 键（任一缺失即视为未登录）
+ * @param anyOfKeys 任一存在即可视为已登录的 Cookie 键（与 requiredKeys 是「或」关系）。
+ *                  139 网盘网页版登录只下发 authorization（无 Os_SSo_Sid/RMKEY）时靠它兜底，
+ *                  否则「保存登录」按钮永远不会出现，登录了也没有效果。
  */
 @Composable
 fun JcefLoginPane(
@@ -73,7 +78,8 @@ fun JcefLoginPane(
     onSave: suspend (String) -> Boolean,
     onBack: () -> Unit,
     onSaved: () -> Unit,
-    onSwitchToPaste: () -> Unit
+    onSwitchToPaste: () -> Unit,
+    anyOfKeys: List<String> = emptyList()
 ) {
     val scope = rememberCoroutineScope()
     val app = JcefHolder.app()
@@ -116,7 +122,7 @@ fun JcefLoginPane(
     LaunchedEffect(browserHolder) {
         if (browserHolder == null) return@LaunchedEffect
         while (true) {
-            val cookie = withContext(Dispatchers.IO) { collectCookies(domains, requiredKeys) }
+            val cookie = withContext(Dispatchers.IO) { collectCookies(domains, requiredKeys, anyOfKeys) }
             if (cookie != null) detectedCookie = cookie
             delay(1500)
         }
@@ -294,13 +300,14 @@ fun JcefLoginPane(
 private class BrowserHolder(val client: CefClient, val browser: CefBrowser)
 
 /**
- * 从全局 Cookie 管理器收集目标域 Cookie；必需键齐全时返回 "k=v; ..." 串。
+ * 从全局 Cookie 管理器收集目标域 Cookie；
+ * requiredKeys 全部存在，或 anyOfKeys 任一存在时返回 "k=v; ..." 串。
  *
  * JCEF 的 visitAllCookies 是**异步**的：CefCookieVisitor.visit 回调在 CEF IO 线程执行，
  * visitAllCookies 返回时回调可能尚未开始/完成。因此调用后必须等待一小段窗口
  * 让回调把结果写入（线程安全收集容器），再判断必需键。
  */
-private fun collectCookies(domains: List<String>, requiredKeys: List<String>): String? {
+private fun collectCookies(domains: List<String>, requiredKeys: List<String>, anyOfKeys: List<String> = emptyList()): String? {
     return runCatching {
         val manager = CefCookieManager.getGlobalManager()
         val pairs = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, String>>()
@@ -320,7 +327,9 @@ private fun collectCookies(domains: List<String>, requiredKeys: List<String>): S
             Log.d(TAG, "cookies for $domains: ${all.size} (keys=${all.map { it.first }.distinct()})")
         }
         val names = all.map { it.first }.toSet()
-        if (requiredKeys.any { !names.contains(it) }) return null
+        val requiredOk = requiredKeys.all { names.contains(it) }
+        val anyOk = anyOfKeys.isNotEmpty() && anyOfKeys.any { names.contains(it) }
+        if (!requiredOk && !anyOk) return null
         all.joinToString("; ") { "${it.first}=${it.second}" }
     }.getOrNull()
 }
