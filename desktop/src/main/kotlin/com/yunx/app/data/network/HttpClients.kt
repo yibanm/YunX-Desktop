@@ -58,7 +58,7 @@ object HttpClients {
             .dispatcher(dispatcher)
             .connectionPool(
                 ConnectionPool(
-                    maxIdleConnections = 64,
+                    maxIdleConnections = 128,
                     keepAliveDuration = 5,
                     timeUnit = TimeUnit.MINUTES
                 )

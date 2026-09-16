@@ -92,8 +92,8 @@ private class ElasticAllocator(
     }
 
     companion object {
-        /** 弹性块大小：4MB（可调；CDN 对同区间并发敏感可降 2MB，单连接限速严重可升 8MB） */
-        const val DEFAULT_ELASTIC_BLOCK = 4 * 1024 * 1024L
+        /** 弹性块大小：8MB（与 chunkCountFor 的 minChunkBytes 对齐，更大单片提升连接复用） */
+        const val DEFAULT_ELASTIC_BLOCK = 8 * 1024 * 1024L
     }
 }
 
@@ -1066,20 +1066,20 @@ class DownloadManager(
     /** 分片临时文件目录：cacheBase()/download_tmp/$id */
     private fun chunkDirOf(id: Long): File = File(cacheBase(), "download_tmp/$id")
 
-    /** 分片数规划（任务池模型）：分片数 = 线程数 × 3。
+    /** 分片数规划（任务池模型）：分片数 = 线程数 × 2。
      *  worker 循环领取盈余块，任一分片慢时其他线程继续领新片，根治"尾部并发塌缩"；
-     *  最小单片 4MB（避免过多小分片频繁建连，"开始快后面慢"的根因），512 封顶。 */
+     *  最小单片 8MB（进一步增大单片体积，提升连接复用率，避免小分片频繁建连拖慢大文件），512 封顶。 */
     private fun chunkCountFor(total: Long, threads: Int): Int {
         if (total <= 0) return 1
-        val minChunkBytes = 4 * 1024 * 1024L
+        val minChunkBytes = 8 * 1024 * 1024L
         val bySize = when {
-            total < 20 * 1024 * 1024 -> 1          // < 20MB 不分片
-            total < 100 * 1024 * 1024 -> 8         // < 100MB
-            total < 500 * 1024 * 1024 -> 16        // < 500MB
-            else -> 32                             // ≥ 500MB 基础值
+            total < 40 * 1024 * 1024 -> 1          // < 40MB 不分片
+            total < 200 * 1024 * 1024 -> 4         // < 200MB
+            total < 1024 * 1024 * 1024 -> 8        // < 1GB
+            else -> 16                             // ≥ 1GB 基础值
         }
-        // 任务池：每线程平均领 3 片，单片体积更大，减少建连开销
-        val want = maxOf(bySize, threads * 3)
+        // 任务池：每线程平均领 2 片，单片体积更大，减少建连开销
+        val want = maxOf(bySize, threads * 2)
         return minOf(want, (total / minChunkBytes).toInt().coerceAtLeast(1), 512)
     }
 }

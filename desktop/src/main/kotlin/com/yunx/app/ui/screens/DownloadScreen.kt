@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +63,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -545,10 +547,8 @@ private fun DownloadSubTaskRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .combinedClickable(
-                onClick = {},
-                onLongClick = { showMenu = true }
-            ),
+            .clickable(onClick = {})
+            .onRightClick { showMenu = true },
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainer
     ) {
@@ -688,6 +688,15 @@ private fun DownloadSubTaskRow(
                         TextButton(onClick = {
                             showMenu = false
                             DesktopActions.copyToClipboard(task.url)
+                            SnackbarController.show("分享链接已复制")
+                        }) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("复制分享链接")
+                        }
+                        TextButton(onClick = {
+                            showMenu = false
+                            DesktopActions.copyToClipboard(task.url)
                             SnackbarController.show("直链已复制")
                         }) {
                             Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -741,10 +750,8 @@ private fun DownloadTaskCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
-            .combinedClickable(
-                onClick = {},
-                onLongClick = { showMenu = true }
-            ),
+            .clickable(onClick = {})
+            .onRightClick { showMenu = true },
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -901,6 +908,15 @@ private fun DownloadTaskCard(
                         TextButton(onClick = {
                             showMenu = false
                             DesktopActions.copyToClipboard(task.url)
+                            SnackbarController.show("分享链接已复制")
+                        }) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("复制分享链接")
+                        }
+                        TextButton(onClick = {
+                            showMenu = false
+                            DesktopActions.copyToClipboard(task.url)
                             SnackbarController.show("直链已复制")
                         }) {
                             Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -937,6 +953,18 @@ private fun openSavedFile(savePath: String) {
     if (savePath.isBlank()) return
     if (!DesktopActions.openFile(savePath)) {
         SnackbarController.show("无法打开该文件")
+    }
+}
+
+/** 桌面端右键检测：按下鼠标右键时触发（替代移动端长按弹出菜单） */
+private fun Modifier.onRightClick(onRightClick: () -> Unit): Modifier = this.pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                onRightClick()
+            }
+        }
     }
 }
 

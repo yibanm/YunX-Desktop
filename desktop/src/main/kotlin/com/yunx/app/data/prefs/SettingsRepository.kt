@@ -1,6 +1,7 @@
 package com.yunx.app.data.prefs
 
 import com.yunx.app.data.download.DownloadPlatform
+import java.util.Base64
 import java.util.prefs.Preferences
 
 /**
@@ -15,10 +16,11 @@ class SettingsRepository {
         get() = downloadThreadsFor(DownloadPlatform.GENERIC)
         set(value) = setDownloadThreads(DownloadPlatform.GENERIC, value)
 
-    /** 获取指定平台的下载线程数；迅雷固定 8，其余默认 32、上限 512 */
+    /** 获取指定平台的下载线程数；迅雷固定 8（受 RANGE_WORKERS_CAP 限制），其余按平台默认值，上限 512 */
     fun downloadThreadsFor(platform: String): Int {
         if (platform == DownloadPlatform.XUNLEI) return XUNLEI_DOWNLOAD_THREADS
-        return prefs.getInt(prefsKey(platform), DEFAULT_DOWNLOAD_THREADS)
+        val default = DEFAULT_THREADS_BY_PLATFORM[platform] ?: DEFAULT_DOWNLOAD_THREADS
+        return prefs.getInt(prefsKey(platform), default)
             .coerceIn(1, MAX_DOWNLOAD_THREADS)
     }
 
@@ -123,12 +125,67 @@ class SettingsRepository {
             prefs.putLong("theme_seed_color", value)
         }
 
+    /** WebDAV 备份服务器地址（如 https://dav.jianguoyun.com/dav/）；空 = 未配置 */
+    var webdavServerUrl: String
+        get() = prefs.get("webdav_server_url", "")
+        set(value) {
+            if (value.isBlank()) prefs.remove("webdav_server_url") else prefs.put("webdav_server_url", value.trim())
+        }
+
+    /** WebDAV 备份用户名 */
+    var webdavUsername: String
+        get() = prefs.get("webdav_username", "")
+        set(value) {
+            if (value.isBlank()) prefs.remove("webdav_username") else prefs.put("webdav_username", value.trim())
+        }
+
+    /** WebDAV 备份密码（简单 Base64 编码存储，仅防明文直观可见，非加密） */
+    var webdavPassword: String
+        get() {
+            val raw = prefs.get("webdav_password_b64", "")
+            if (raw.isBlank()) return ""
+            return runCatching {
+                String(Base64.getDecoder().decode(raw), Charsets.UTF_8)
+            }.getOrDefault("")
+        }
+        set(value) {
+            if (value.isBlank()) {
+                prefs.remove("webdav_password_b64")
+            } else {
+                prefs.put("webdav_password_b64", Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8)))
+            }
+        }
+
+    /** WebDAV 定时备份间隔（小时）；0 = 关闭，默认 0 */
+    var webdavBackupIntervalHours: Int
+        get() = prefs.getInt("webdav_backup_interval_hours", 0)
+        set(value) {
+            prefs.putInt("webdav_backup_interval_hours", value.coerceAtLeast(0))
+        }
+
+    /** 本地定时备份间隔（小时）；0 = 关闭，默认 0 */
+    var localBackupIntervalHours: Int
+        get() = prefs.getInt("local_backup_interval_hours", 0)
+        set(value) {
+            prefs.putInt("local_backup_interval_hours", value.coerceAtLeast(0))
+        }
+
     companion object {
         const val DEFAULT_DOWNLOAD_THREADS = 32
         const val MAX_DOWNLOAD_THREADS = 512
         const val XUNLEI_DOWNLOAD_THREADS = 8
         const val DEFAULT_MAX_CONCURRENT_DOWNLOADS = 1
         const val DEFAULT_DOWNLOAD_RETRY_COUNT = 3
+
+        /** 各网盘默认下载线程数（用户未单独设置时使用；迅雷固定 8 走 RANGE_WORKERS_CAP） */
+        val DEFAULT_THREADS_BY_PLATFORM: Map<String, Int> = mapOf(
+            DownloadPlatform.QUARK to 16,
+            DownloadPlatform.UC to 16,
+            DownloadPlatform.XUNLEI to 8,
+            DownloadPlatform.BAIDU to 8,
+            DownloadPlatform.C139 to 16,
+            DownloadPlatform.PAN123 to 16
+        )
 
         /** 默认主题种子色：Material Blue（与内置默认方案一致） */
         const val DEFAULT_SEED_COLOR = 0xFF415F91L

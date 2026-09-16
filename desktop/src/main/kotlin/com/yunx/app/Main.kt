@@ -13,6 +13,10 @@ import com.yunx.app.ui.jcef.JcefHolder
 import com.yunx.app.ui.theme.ComposeEmptyActivityTheme
 import com.yunx.app.util.WindowFx
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 fun main(args: Array<String>) {
     // 渲染后端：默认 OPENGL（GPU 渲染，动画流畅且文字清晰，2026-09-05 用户实测确认）。
@@ -38,6 +42,9 @@ fun main(args: Array<String>) {
     }
     // 迅雷设备指纹（进程启动时初始化一次，等价原 Application.onCreate）
     XunleiDeviceFingerprint.init()
+
+    // 启动定时备份协程（WebDAV / 本地；在后台静默执行，失败不影响主流程）
+    startScheduledBackup(SettingsRepository())
 
     // 诊断模式：--jcef-smoke [url]，创建内嵌浏览器加载页面并输出 Cookie 统计后退出
     if (args.contains("--jcef-smoke")) {
@@ -112,6 +119,57 @@ private fun loadWindowIcon(): androidx.compose.ui.graphics.painter.Painter? = ru
         org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap()
     )
 }.getOrNull()
+
+/**
+ * 启动定时备份协程：
+ * - WebDAV：webdavBackupIntervalHours > 0 且 WebDAV 配置已保存时，每隔指定小时数自动备份到 YunX/
+ * - 本地：localBackupIntervalHours > 0 时，每隔指定小时数自动备份到 dataDir/YunX/
+ * 用 GlobalScope + while(true) + delay，失败静默继续下一轮。
+ */
+private fun startScheduledBackup(settings: SettingsRepository) {
+    val webdavHours = settings.webdavBackupIntervalHours
+    val localHours = settings.localBackupIntervalHours
+    if (webdavHours <= 0 && localHours <= 0) return
+
+    val manager = com.yunx.app.data.backup.WebDavBackupManager()
+    val options = com.yunx.app.data.backup.WebDavBackupManager.BackupOptions(
+        includeFavorites = true,
+        includeLinkHistory = true,
+        includeDownloadRecords = true,
+        includeAuth = false
+    )
+
+    // WebDAV 定时备份
+    if (webdavHours > 0 &&
+        settings.webdavServerUrl.isNotBlank() &&
+        settings.webdavUsername.isNotBlank()
+    ) {
+        val config = com.yunx.app.data.backup.WebDavBackupManager.Config(
+            serverUrl = settings.webdavServerUrl,
+            username = settings.webdavUsername,
+            password = settings.webdavPassword
+        )
+        GlobalScope.launch(Dispatchers.IO) {
+            // 启动后先等待一个间隔再首次备份，避免启动瞬间占带宽
+            delay(webdavHours * 3600_000L)
+            while (true) {
+                runCatching { manager.backup(config, options) }
+                delay(webdavHours * 3600_000L)
+            }
+        }
+    }
+
+    // 本地定时备份
+    if (localHours > 0) {
+        GlobalScope.launch(Dispatchers.IO) {
+            delay(localHours * 3600_000L)
+            while (true) {
+                runCatching { manager.backupLocal(options) }
+                delay(localHours * 3600_000L)
+            }
+        }
+    }
+}
 
 /**
  * 内嵌浏览器诊断冒烟：主线程初始化 JCEF → 创建浏览器加载页面 → 等待 20s → 输出 Cookie 统计。

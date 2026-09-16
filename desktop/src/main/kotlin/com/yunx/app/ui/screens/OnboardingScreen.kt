@@ -89,7 +89,8 @@ fun OnboardingScreen(
             Text(
                 text = "云析",
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
@@ -258,7 +259,8 @@ private fun OnboardingFeature(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
@@ -276,7 +278,7 @@ private fun OnboardingFeature(
 private fun GitHubCard() {
     Card(
         onClick = {
-            DesktopActions.openUrl("https://github.com/CYQawa/YunX")
+            DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop-Fork")
         },
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -307,10 +309,11 @@ private fun GitHubCard() {
                 Text(
                     text = "开源仓库",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "github.com/CYQawa/YunX",
+                    text = "github.com/yibanm/YunX-Desktop-Fork",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

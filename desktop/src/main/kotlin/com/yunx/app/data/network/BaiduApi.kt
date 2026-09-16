@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -535,25 +536,61 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
 
     /**
      * 执行请求并解析 JSON。
-     * 针对百度风控/频率限制 errno=8888：等待 2 秒后自动重试，最多重试 3 次（共 4 次尝试）；
+     * 针对百度风控/频率限制 errno=8888：每次重试都重新构建 Request（OkHttp 可能把已消费的
+     * Request 标记为不可复用），等待 3 秒后自动重试，最多重试 5 次（共 6 次尝试）。
+     * 重试时额外携带 Accept 任意类型 与 Accept-Language 头，模拟浏览器请求绕过风控。
      * 其它 errno 原样返回，仍由调用方 checkErrno 抛异常。
      */
     private suspend fun executeJson(request: Request): JSONObject {
+        // 提取原 request 的全部信息，每次重试时用 Builder 重建（不直接复用旧 Request 实例）
+        val originalUrl = request.url
+        val originalMethod = request.method
+        val originalBody = request.body
+        val originalHeaders = request.headers
+
         var last: JSONObject? = null
-        // 1 次首试 + 最多 3 次重试
-        repeat(4) { attempt ->
-            val response = client.newCall(request).execute()
+        // 1 次首试 + 最多 5 次重试 = 6 次总尝试
+        repeat(6) { attempt ->
+            // 每次重试都用 Builder 重新构建 Request，避免复用已被 OkHttp 消费的实例
+            val builder = Request.Builder()
+                .url(originalUrl)
+            for (i in 0 until originalHeaders.size) {
+                builder.header(originalHeaders.name(i), originalHeaders.value(i))
+            }
+            // errno=8888 重试时额外加浏览器友好头（首试不加，避免覆盖原调用方设置）
+            if (attempt > 0) {
+                if (originalHeaders["Accept"] == null) builder.header("Accept", "*/*")
+                if (originalHeaders["Accept-Language"] == null) {
+                    builder.header("Accept-Language", "zh-CN,zh;q=0.9")
+                }
+            }
+            when (originalMethod.uppercase()) {
+                "GET" -> builder.get()
+                "HEAD" -> builder.head()
+                "DELETE" -> builder.delete(originalBody ?: ByteArray(0).toRequestBody(null))
+                "POST" -> builder.post(originalBody ?: ByteArray(0).toRequestBody(null))
+                "PUT" -> builder.put(originalBody ?: ByteArray(0).toRequestBody(null))
+                "PATCH" -> builder.patch(originalBody ?: ByteArray(0).toRequestBody(null))
+                else -> builder.method(originalMethod, originalBody ?: ByteArray(0).toRequestBody(null))
+            }
+            val rebuilt = builder.build()
+
+            val response = client.newCall(rebuilt).execute()
             val body = response.use { it.body?.string() ?: throw BaiduApiException("请求失败：响应为空") }
             val json = runCatching { JSONObject(body) }.getOrElse {
                 throw BaiduApiException("响应解析失败")
             }
             last = json
-            // errno=8888 为百度风控/频率限制，等待后通常恢复；非末次尝试时延迟 2s 重试
-            if (json.optInt("errno") == 8888 && attempt < 3) {
-                delay(2000)
+            // errno=8888 为百度风控/频率限制，等待后通常恢复；非末次尝试时延迟 3s 重试
+            if (json.optInt("errno") == 8888 && attempt < 5) {
+                delay(3000)
                 return@repeat
             }
             return json
+        }
+        // 所有重试后仍是 8888：抛明确限流异常
+        if (last?.optInt("errno") == 8888) {
+            throw BaiduApiException("百度接口限流，请稍后再试（errno=8888）")
         }
         return last ?: throw BaiduApiException("响应解析失败")
     }

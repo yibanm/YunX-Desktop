@@ -1,6 +1,7 @@
 package com.yunx.app.ui.screens
 
 import com.yunx.app.ui.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,9 +35,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -129,6 +134,30 @@ fun SupportScreen(
                 }
             }
 
+            // ---------- 赞赏码 ----------
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.Top
+            ) {
+                RewardCard(
+                    imageRes = "reward_author.jpg",
+                    title = "原作者 CYQawa",
+                    subtitle = "微信赞赏码"
+                )
+                RewardCard(
+                    imageRes = "reward_user.png",
+                    title = "维护者 richkobe",
+                    subtitle = "微信赞赏码"
+                )
+            }
+            Text(
+                text = "你的每一份支持，都是持续维护与更新的动力",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
             // ---------- 作者致谢 ----------
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -161,8 +190,8 @@ fun SupportScreen(
 
                     AuthorCard(
                         role = "原安卓项目作者",
-                        username = "tidain",
-                        repoUrl = "https://github.com/tidain/YunX"
+                        username = "CYQawa",
+                        repoUrl = "https://github.com/CYQawa/YunX"
                     )
                     AuthorCard(
                         role = "Windows桌面端作者",
@@ -237,6 +266,60 @@ fun SupportScreen(
                 Text("去GitHub点个star")
             }
         }
+    }
+}
+
+/** 赞赏码卡片：200dp 图片区域，整体宽 210dp；资源缺失时显示占位文字 */
+@Composable
+private fun RewardCard(
+    imageRes: String,
+    title: String,
+    subtitle: String
+) {
+    // classLoader 探测资源是否存在，不存在时回退为占位块
+    val exists = remember {
+        Thread.currentThread().contextClassLoader?.getResource(imageRes) != null
+    }
+    Column(
+        modifier = Modifier.width(210.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (exists) {
+            Image(
+                painter = painterResource(imageRes),
+                contentDescription = title,
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "赞赏码",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

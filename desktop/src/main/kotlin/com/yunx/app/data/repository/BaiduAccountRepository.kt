@@ -4,6 +4,7 @@ import com.yunx.app.data.db.BaiduAccountDao
 import com.yunx.app.data.db.BaiduAccountEntity
 import com.yunx.app.data.network.BaiduApi
 import com.yunx.app.data.network.BaiduConstants
+import com.yunx.app.util.CookieCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -20,8 +21,9 @@ class BaiduAccountRepository(
 
     suspend fun getAccount(): BaiduAccountEntity? = dao.getAccount()
 
-    /** 退出登录：清理 WebView Cookie + 清除本地记录 */
+    /** 退出登录：清理 JCEF Cookie + 清除本地记录 */
     suspend fun logoutBaidu() {
+        CookieCleaner.clearCookiesForDomains(listOf("pan.baidu.com", "yun.baidu.com", "baidu.com"))
         dao.clear()
     }
 

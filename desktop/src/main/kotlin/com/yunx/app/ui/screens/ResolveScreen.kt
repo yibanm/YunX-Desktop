@@ -25,7 +25,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -59,6 +62,7 @@ import com.yunx.app.data.network.ShareLinkParser
 import com.yunx.app.data.network.SharePlatform
 import com.yunx.app.ui.SnackbarController
 import com.yunx.app.ui.resolve.DownloadLinkDialog
+import com.yunx.app.ui.resolve.LinkHistoryDialog
 import com.yunx.app.ui.resolve.ShareDetailScreen
 import com.yunx.app.ui.viewmodel.BaiduCloudViewModel
 import com.yunx.app.ui.viewmodel.C139CloudViewModel
@@ -105,6 +109,8 @@ fun ResolveScreen(
     // 用 rememberSaveable：切换 Tab 后返回仍保留（避免「忽略后切页回来又弹」）
     var clipboardSuggestion by rememberSaveable { mutableStateOf<String?>(null) }
     var ignoredClipboard by rememberSaveable { mutableStateOf<String?>(null) }
+    // 链接历史弹窗：输入页（解析前）即可打开，收藏按钮在未解析时禁用并提示
+    var showLinkHistory by remember { mutableStateOf(false) }
 
     // 检测函数：读取剪贴板，满足条件则设置提示（三重触发：组合时 / ON_RESUME / 轮询）
     val maybeSuggestClipboard: () -> Unit = {
@@ -201,7 +207,9 @@ fun ResolveScreen(
                         pwd = ""
                         pwdEdited = false
                     },
-                    onClearPwd = { pwd = "" }
+                    onClearPwd = { pwd = "" },
+                    onOpenHistory = { showLinkHistory = true },
+                    onBookmarkClick = { SnackbarController.show("请先解析链接") }
                 )
             }
         }
@@ -275,6 +283,16 @@ fun ResolveScreen(
             onDismiss = { viewModel.dismissDownloadDialog() }
         )
     }
+
+    // 链接历史弹窗（输入页即可打开；选择某条历史后重新解析）
+    LinkHistoryDialog(
+        visible = showLinkHistory,
+        onDismiss = { showLinkHistory = false },
+        onSelect = { url, pwd ->
+            showLinkHistory = false
+            viewModel.startResolve(url, pwd.ifBlank { null })
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -288,7 +306,11 @@ private fun ResolveInputContent(
     pwd: String,
     onPwdChange: (String) -> Unit,
     onClearLink: () -> Unit,
-    onClearPwd: () -> Unit
+    onClearPwd: () -> Unit,
+    /** 打开链接历史（解析前即可用） */
+    onOpenHistory: () -> Unit,
+    /** 收藏按钮点击（未解析时禁用并提示） */
+    onBookmarkClick: () -> Unit
 ) {
     val isLoading = state is ResolveUiState.Loading
 
@@ -300,6 +322,31 @@ private fun ResolveInputContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 顶部操作行：链接历史（始终可用）+ 收藏（未解析时半透明，点击提示）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onOpenHistory) {
+                Icon(
+                    imageVector = Icons.Outlined.History,
+                    contentDescription = "链接历史",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(
+                onClick = onBookmarkClick,
+                modifier = Modifier.alpha(0.5f)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.BookmarkAdd,
+                    contentDescription = "添加至收藏",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         Text(
             text = "粘贴分享链接，一键解析分享内容",
             style = MaterialTheme.typography.bodyMedium,
