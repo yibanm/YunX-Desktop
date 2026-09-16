@@ -261,7 +261,7 @@ namespace YunXDesktop
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            ShowInTaskbar = false;
+            ShowInTaskbar = true;
             TopMost = true;
             DoubleBuffered = true;
             Size = new Size(460, 280);

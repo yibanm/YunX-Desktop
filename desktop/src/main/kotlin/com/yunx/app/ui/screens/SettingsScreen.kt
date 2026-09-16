@@ -172,7 +172,9 @@ fun SettingsScreen(
     var isWebDavBusy by remember { mutableStateOf(false) }
     // 定时备份间隔（小时，0=关闭）
     var webdavInterval by remember { mutableStateOf(settingsRepo.webdavBackupIntervalHours) }
+    var localInterval by remember { mutableStateOf(settingsRepo.localBackupIntervalHours) }
     var intervalMenuExpanded by remember { mutableStateOf(false) }
+    var localIntervalMenuExpanded by remember { mutableStateOf(false) }
     // 远端 / 本地备份文件列表
     var remoteBackups by remember { mutableStateOf<List<WebDavBackupManager.BackupFile>>(emptyList()) }
     var showRemoteBackups by remember { mutableStateOf(false) }
@@ -946,7 +948,7 @@ fun SettingsScreen(
                 }
                 // 定时备份：关闭 / 每小时 / 每天 / 每周
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("定时备份：", style = MaterialTheme.typography.bodyMedium)
+                    Text("WebDAV定时：", style = MaterialTheme.typography.bodyMedium)
                     TextButton(onClick = { intervalMenuExpanded = true }) {
                         Text(webdavIntervalLabel(webdavInterval))
                     }
@@ -966,6 +968,32 @@ fun SettingsScreen(
                                     webdavInterval = hours
                                     settingsRepo.webdavBackupIntervalHours = hours
                                     intervalMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("本地定时：", style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { localIntervalMenuExpanded = true }) {
+                        Text(webdavIntervalLabel(localInterval))
+                    }
+                    DropdownMenu(
+                        expanded = localIntervalMenuExpanded,
+                        onDismissRequest = { localIntervalMenuExpanded = false }
+                    ) {
+                        listOf(
+                            0 to "关闭",
+                            1 to "每小时",
+                            24 to "每天",
+                            168 to "每周"
+                        ).forEach { (hours, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    localInterval = hours
+                                    settingsRepo.localBackupIntervalHours = hours
+                                    localIntervalMenuExpanded = false
                                 }
                             )
                         }
