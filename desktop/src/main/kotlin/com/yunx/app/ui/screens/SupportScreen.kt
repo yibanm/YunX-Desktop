@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -48,8 +49,8 @@ import com.yunx.app.ui.SnackbarController
 import com.yunx.app.util.DesktopActions
 
 /**
- * 支持开发页：展示捐赠信息与开源仓库入口（桌面版不提供二维码图片保存，改为链接支持）。
- * Material3 风格：渐变头部 + 卡片展示捐赠说明 + 感谢语 + 开源仓库按钮。
+ * 支持开发页：展示赞助信息与开源仓库入口。
+ * Material3 风格：渐变头部 + 卡片展示赞助说明 + 作者致谢 + 开源仓库按钮。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,7 +134,7 @@ fun SupportScreen(
                 }
             }
 
-            // ---------- 捐赠信息卡片 ----------
+            // ---------- 赞助信息卡片 ----------
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
@@ -156,17 +157,17 @@ fun SupportScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "扫码赞赏支持",
+                            text = "扫码支持",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium
                         )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 两个赞赏码并排：原作者 + 维护者
+                    // 两个二维码并排展示
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally)
+                        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally)
                     ) {
                         RewardCodeCard(
                             imageRes = "reward_author.jpg",
@@ -176,7 +177,7 @@ fun SupportScreen(
                         RewardCodeCard(
                             imageRes = "reward_user.png",
                             title = "维护者 richkobe",
-                            subtitle = "支付宝赞赏码"
+                            subtitle = "微信赞赏码"
                         )
                     }
 
@@ -186,6 +187,54 @@ fun SupportScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // ---------- 作者致谢 ----------
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.OpenInNew,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "作者",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    AuthorCard(
+                        role = "原安卓项目作者",
+                        username = "tidain",
+                        repoUrl = "https://github.com/tidain/YunX"
+                    )
+                    AuthorCard(
+                        role = "Windows桌面端作者",
+                        username = "tidain",
+                        repoUrl = "https://github.com/tidain/YunX-Desktop"
+                    )
+                    AuthorCard(
+                        role = "Windows桌面端Fork作者",
+                        username = "yibanm",
+                        repoUrl = "https://github.com/yibanm/YunX-Desktop-Fork"
                     )
                 }
             }
@@ -234,7 +283,7 @@ fun SupportScreen(
             // ---------- 开源仓库入口 ----------
             Button(
                 onClick = {
-                    DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop")
+                    DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop-Fork")
                     SnackbarController.show("已打开开源仓库页面")
                 },
                 modifier = Modifier
@@ -247,33 +296,86 @@ fun SupportScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("前往 GitHub 支持")
+                Text("去GitHub点个star")
             }
         }
     }
 }
 
-/** 赞赏码卡片：二维码图片 + 标题 + 副标题 */
+/** 作者卡片：左侧角色 + 用户名，右侧跳转 GitHub 按钮 */
+@Composable
+private fun AuthorCard(
+    role: String,
+    username: String,
+    repoUrl: String
+) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = role,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "@$username",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = { DesktopActions.openUrl(repoUrl) }) {
+                Text("去GitHub点个star")
+            }
+        }
+    }
+}
+
+/** 二维码卡片：资源缺失时降级为占位，避免图片缺失导致崩溃 */
 @Composable
 private fun RewardCodeCard(
     imageRes: String,
     title: String,
     subtitle: String
 ) {
+    // 非组合上下文判断资源是否存在；存在时才在组合态调用 painterResource
+    val exists = remember(imageRes) { resourceExists(imageRes) }
+    val painter = if (exists) painterResource(imageRes) else null
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(140.dp)
+        modifier = Modifier.width(200.dp)
     ) {
         Surface(
-            modifier = Modifier.size(140.dp),
+            modifier = Modifier.size(200.dp),
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHighest
         ) {
-            Image(
-                painter = painterResource(imageRes),
-                contentDescription = title,
-                modifier = Modifier.padding(8.dp)
-            )
+            if (painter != null) {
+                Image(
+                    painter = painter,
+                    contentDescription = title,
+                    modifier = Modifier.padding(8.dp)
+                )
+            } else {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "赞赏码",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -290,3 +392,8 @@ private fun RewardCodeCard(
         )
     }
 }
+
+/** 判断 classpath 根目录下是否存在指定资源（非组合上下文，供 remember 调用） */
+private fun resourceExists(name: String): Boolean = runCatching {
+    Thread.currentThread().contextClassLoader?.getResource(name) != null
+}.getOrDefault(false)

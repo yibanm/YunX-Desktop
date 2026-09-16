@@ -39,6 +39,13 @@ class SettingsRepository {
             if (value.isNullOrBlank()) prefs.remove("download_dir_uri") else prefs.put("download_dir_uri", value)
         }
 
+    /** 自定义下载缓存目录（分片/合并临时文件）；null/空 = 默认 ~/.yunx-pc/cache，修改后需重启生效 */
+    var downloadCacheDir: String?
+        get() = prefs.get("download_cache_dir", null)
+        set(value) {
+            if (value.isNullOrBlank()) prefs.remove("download_cache_dir") else prefs.put("download_cache_dir", value)
+        }
+
     /** 最大同时下载任务数（默认 1：前台任务吃满带宽，其余排队） */
     var maxConcurrentDownloads: Int
         get() = prefs.getInt("max_concurrent_downloads", DEFAULT_MAX_CONCURRENT_DOWNLOADS)

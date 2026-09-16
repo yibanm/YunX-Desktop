@@ -1,4 +1,4 @@
-# YunX-Desktop（云析桌面版）
+# YunX-Desktop-Fork（云析桌面版）
 
 [云析 YunX](https://github.com/CYQawa/YunX)（Android 网盘分享链接解析 + 高速下载器）的 **Windows 桌面移植**。
 
@@ -36,22 +36,22 @@
 要求：Windows 10/11 x64。零手动环境配置 —— 缺 JDK 自动下载（`jdk-setup.ps1`），Gradle 发行版由 wrapper 自动拉取，Inno Setup 6 缺失时安装器脚本会自动下载并静默安装。
 
 ```powershell
-git clone https://github.com/yibanm/YunX-Desktop.git
-cd YunX-Desktop
+git clone https://github.com/yibanm/YunX-Desktop-Fork.git
+cd YunX-Desktop-Fork
 
 .\run.ps1 run        # 编译并启动（开发）
 .\run.ps1 build      # 仅编译
-.\run.ps1 package    # 免安装便携版 → release\YunX-Desktop\
-.\run.ps1 installer  # 单文件安装程序 → release\YunX-Desktop-setup-*.exe
+.\run.ps1 package    # 免安装便携版 → release\YunX-Desktop-Fork\
+.\run.ps1 installer  # 单文件安装程序 → release\YunX-Desktop-Fork-setup-*.exe
 ```
 
 也可双击 `run.bat`（走同一入口）。中文向导语言包随仓库分发（`installer\ChineseSimplified.isl`）。
 
 ## 打包产物
 
-- **便携版**：`release\YunX-Desktop\`（整个文件夹拷走即用，双击 `YunX-Desktop.exe` 运行）
-- **安装程序**：`release\YunX-Desktop-setup-<版本>.exe`（每用户安装到
-  `%LOCALAPPDATA%\Programs\YunX-Desktop`，无需管理员权限，开始菜单/桌面快捷方式「云析」，可卸载）
+- **便携版**：`release\YunX-Desktop-Fork\`（整个文件夹拷走即用，双击 `YunX-Desktop-Fork.exe` 运行）
+- **安装程序**：`release\YunX-Desktop-Fork-setup-<版本>.exe`（每用户安装到
+  `%LOCALAPPDATA%\Programs\YunX-Desktop-Fork`，无需管理员权限，开始菜单/桌面快捷方式「云析」，可卸载）
 
 ## 使用
 

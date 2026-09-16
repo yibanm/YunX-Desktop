@@ -125,3 +125,17 @@ data class BookmarkEntity(
         )
     }
 }
+
+/** 网盘解析历史（解析过的分享链接，便于一键重新解析）。 */
+data class LinkHistoryEntity(
+    val id: Long = 0,
+    /** 完整分享链接 */
+    val url: String,
+    /** 分享标题（解析后回填；为空时展示回退为 url） */
+    val title: String = "",
+    /** 平台枚举名（QUARK/UC/XUNLEI/BAIDU/C139/PAN123），未知为空串 */
+    val platform: String = "",
+    /** 提取码（可选） */
+    val pwd: String = "",
+    val createTime: Long = System.currentTimeMillis()
+)

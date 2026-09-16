@@ -102,7 +102,7 @@ fun AboutScreen(
                 title = "应用简介",
                 description = "云析（YunX）是一款网盘分享链接解析与高速下载工具。" +
                     "粘贴分享链接，登录网盘账号后即可浏览分享内容并直接高速下载文件。\n" +
-                    "桌面移植端：YunX-Desktop 基于 Compose Multiplatform 构建，" +
+                    "桌面移植端：YunX-Desktop-Fork 基于 Compose Multiplatform 构建，" +
                     "将云析完整移植到 Windows 桌面，提供与移动端一致的解析与下载体验。"
             )
             
@@ -170,7 +170,7 @@ private fun AppHeader(versionName: String) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "YunX-Desktop · v$versionName",
+            text = "YunX-Desktop-Fork · v$versionName",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -464,7 +464,7 @@ private fun CardIcon(icon: ImageVector) {
 private fun GitHubCard() {
     Card(
         onClick = {
-            DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop")
+            DesktopActions.openUrl("https://github.com/yibanm/YunX-Desktop-Fork")
         },
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -500,7 +500,7 @@ private fun GitHubCard() {
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "github.com/yibanm/YunX-Desktop",
+                    text = "github.com/yibanm/YunX-Desktop-Fork",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

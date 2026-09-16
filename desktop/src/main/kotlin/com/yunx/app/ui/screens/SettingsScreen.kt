@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.Tune
@@ -36,8 +39,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -66,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import com.yunx.app.AppContext
 import com.yunx.app.data.backup.AuthBackupManager
 import com.yunx.app.data.backup.AuthCrypto
+import com.yunx.app.data.backup.WebDavBackupManager
 import com.yunx.app.data.download.DownloadPlatform
 import com.yunx.app.data.download.DownloadSaver
 import com.yunx.app.data.prefs.SettingsRepository
@@ -139,6 +145,22 @@ fun SettingsScreen(
     // 用户体验与系统适配：下载时阻止休眠 / 通知中心进度
     var keepAwake by remember { mutableStateOf(settingsRepo.keepAwakeWhileDownloading) }
     var showSpeed by remember { mutableStateOf(settingsRepo.notificationShowSpeed) }
+
+    // 下载缓存位置：运行时注入 AppContext.customCacheDir（默认 = ~/.yunx-pc/cache）
+    var cachePath by remember { mutableStateOf(settingsRepo.downloadCacheDir) }
+    LaunchedEffect(cachePath) { AppContext.customCacheDir = cachePath }
+
+    // WebDAV 备份弹窗
+    var showWebDavDialog by remember { mutableStateOf(false) }
+    var webdavServer by remember { mutableStateOf("") }
+    var webdavUser by remember { mutableStateOf("") }
+    var webdavPassword by remember { mutableStateOf("") }
+    var includeFavorites by remember { mutableStateOf(true) }
+    var includeLinkHistory by remember { mutableStateOf(true) }
+    var includeDownloadRecords by remember { mutableStateOf(true) }
+    var includeAuth by remember { mutableStateOf(false) }
+    var isWebDavBusy by remember { mutableStateOf(false) }
+    val webDavManager = remember { WebDavBackupManager() }
 
     Column(
         modifier = modifier
@@ -252,6 +274,74 @@ fun SettingsScreen(
             trailing = { Switch(checked = showSpeed, onCheckedChange = null) }
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 下载缓存位置：打开缓存目录 / 清除缓存 / 自定义路径
+        SettingsItem(
+            icon = Icons.Outlined.FolderOpen,
+            title = "下载缓存位置",
+            description = cachePath?.let { "已自定义：$it" } ?: "默认：~/.yunx-pc/cache",
+            onClick = {
+                scope.launch {
+                    val dir = withContext(Dispatchers.IO) { DesktopActions.pickDirectory() }
+                    if (!dir.isNullOrBlank()) {
+                        cachePath = dir
+                        settingsRepo.downloadCacheDir = dir
+                        SnackbarController.show("缓存路径已更新，重启后生效")
+                    }
+                }
+            },
+            trailing = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        val ok = DesktopActions.openFile(AppContext.cacheDir.absolutePath)
+                        if (!ok) SnackbarController.show("缓存目录不存在")
+                    }) {
+                        Icon(
+                            Icons.Outlined.FolderOpen,
+                            contentDescription = "打开缓存目录",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    AppContext.downloadTmpDir.deleteRecursively()
+                                    AppContext.mergeDir.deleteRecursively()
+                                    AppContext.downloadTmpDir.mkdirs()
+                                    AppContext.mergeDir.mkdirs()
+                                }
+                            }
+                            SnackbarController.show("下载缓存已清除")
+                        }
+                    }) {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = "清除缓存",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    if (cachePath != null) {
+                        TextButton(
+                            onClick = {
+                                cachePath = null
+                                settingsRepo.downloadCacheDir = null
+                                SnackbarController.show("已恢复默认缓存路径，重启后生效")
+                            },
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Text(
+                                text = "恢复默认",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        )
+
         Spacer(modifier = Modifier.height(24.dp))
 
         SectionLabel("外观")
@@ -343,6 +433,53 @@ fun SettingsScreen(
                             isImporting = false
                         }
                     }
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SectionLabel("备份与同步")
+        SettingsItem(
+            icon = Icons.Outlined.Backup,
+            title = "WebDAV 备份",
+            description = "将收藏、历史、下载记录等备份到 WebDAV 服务器",
+            onClick = { showWebDavDialog = true }
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsItem(
+            icon = Icons.Outlined.Save,
+            title = "本地备份导出",
+            description = "导出为 JSON 文件到本地",
+            onClick = {
+                scope.launch {
+                    val options = WebDavBackupManager.BackupOptions(
+                        includeFavorites = true,
+                        includeLinkHistory = true,
+                        includeDownloadRecords = true,
+                        includeAuth = false
+                    )
+                    val json = withContext(Dispatchers.IO) {
+                        runCatching { webDavManager.buildBackupJson(options) }.getOrNull()
+                    }
+                    if (json == null) {
+                        SnackbarController.show("导出失败")
+                        return@launch
+                    }
+                    val target = DesktopActions.saveFile(
+                        defaultName = "yunx_backup.json",
+                        title = "导出本地备份",
+                        filters = listOf("云析备份 (*.json)" to "*.json", "所有文件 (*.*)" to "*.*"),
+                        defaultExtension = "json"
+                    ) ?: return@launch
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching {
+                            java.io.File(target).writeText(json, Charsets.UTF_8)
+                            true
+                        }.getOrDefault(false)
+                    }
+                    SnackbarController.show(if (saved) "已导出到 ${java.io.File(target).parent}" else "导出失败")
                 }
             }
         )
@@ -666,6 +803,119 @@ fun SettingsScreen(
     OperationLoadingDialog(visible = isExporting, message = "正在导出认证…")
     OperationLoadingDialog(visible = isImporting, message = "正在导入认证…")
 
+    // WebDAV 备份与同步弹窗
+    FadeAlertDialog(
+        visible = showWebDavDialog,
+        onDismissRequest = { if (!isWebDavBusy) showWebDavDialog = false },
+        title = { Text("WebDAV 备份与同步") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = webdavServer,
+                    onValueChange = { webdavServer = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("服务器地址") },
+                    placeholder = { Text("https://dav.example.com") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = webdavUser,
+                    onValueChange = { webdavUser = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("用户名") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = webdavPassword,
+                    onValueChange = { webdavPassword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("密码") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true
+                )
+                Text(
+                    text = "备份内容",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                BackupCheckboxRow(checked = includeFavorites, label = "收藏的网盘链接") { includeFavorites = it }
+                BackupCheckboxRow(checked = includeLinkHistory, label = "网盘解析历史") { includeLinkHistory = it }
+                BackupCheckboxRow(checked = includeDownloadRecords, label = "下载记录") { includeDownloadRecords = it }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = includeAuth, onCheckedChange = { includeAuth = it })
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("网盘认证", color = MaterialTheme.colorScheme.error)
+                        Text(
+                            text = "包含敏感数据，切勿随意分享",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+                if (isWebDavBusy) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (webdavServer.isBlank() || webdavUser.isBlank()) {
+                        SnackbarController.show("请填写服务器地址与用户名")
+                        return@Button
+                    }
+                    val config = WebDavBackupManager.Config(webdavServer.trim(), webdavUser.trim(), webdavPassword)
+                    val options = WebDavBackupManager.BackupOptions(
+                        includeFavorites = includeFavorites,
+                        includeLinkHistory = includeLinkHistory,
+                        includeDownloadRecords = includeDownloadRecords,
+                        includeAuth = includeAuth
+                    )
+                    isWebDavBusy = true
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { webDavManager.backupToWebDav(config, options) }
+                            SnackbarController.show("已备份到 WebDAV")
+                        } catch (e: Exception) {
+                            SnackbarController.show("备份失败：${e.message}")
+                        } finally {
+                            isWebDavBusy = false
+                        }
+                    }
+                },
+                enabled = !isWebDavBusy
+            ) { Text("备份到 WebDAV") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    if (webdavServer.isBlank() || webdavUser.isBlank()) {
+                        SnackbarController.show("请填写服务器地址与用户名")
+                        return@TextButton
+                    }
+                    val config = WebDavBackupManager.Config(webdavServer.trim(), webdavUser.trim(), webdavPassword)
+                    isWebDavBusy = true
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { webDavManager.restoreFromWebDav(config) }
+                            SnackbarController.show("已从 WebDAV 恢复")
+                        } catch (e: Exception) {
+                            SnackbarController.show("恢复失败：${e.message}")
+                        } finally {
+                            isWebDavBusy = false
+                        }
+                    }
+                },
+                enabled = !isWebDavBusy
+            ) { Text("从 WebDAV 恢复") }
+        }
+    )
+
     // 最大同时下载任务数
     FadeAlertDialog(
         visible = showConcurrencyDialog,
@@ -942,6 +1192,16 @@ private fun ImportAuthDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
+}
+
+/** 备份内容复选框行 */
+@Composable
+private fun BackupCheckboxRow(checked: Boolean, label: String, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onChange)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 /** 操作处理中弹窗：转圈加载 + 提示文案，禁止关闭（防止中途取消导致导入/导出状态不一致） */
