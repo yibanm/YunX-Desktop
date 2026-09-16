@@ -53,3 +53,7 @@ hs_err_pid*
 # ---- 赞赏码图片（本地保留用于打包，绝不提交到远端仓库）----
 desktop/src/main/resources/reward_author.jpg
 desktop/src/main/resources/reward_user.png
+
+# Launcher build artifacts
+launcher/bin/
+launcher/obj/

@@ -218,7 +218,7 @@ namespace YunXDesktop
         {
             try
             {
-                MessageBox.Show(msg, "云析 YunX-Desktop", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(msg, "云析 YunX-Desktop-fork", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch { }
         }
@@ -330,9 +330,9 @@ namespace YunXDesktop
             var sz = g.MeasureString("云析", titleFont);
             using (var b = new SolidBrush(Color.FromArgb(236, 236, 241)))
                 g.DrawString("云析", titleFont, b, (w - sz.Width) / 2f, 126);
-            var sz2 = g.MeasureString("YunX-Desktop", subFont);
+            var sz2 = g.MeasureString("YunX-Desktop-fork", subFont);
             using (var b = new SolidBrush(Color.FromArgb(154, 160, 166)))
-                g.DrawString("YunX-Desktop", subFont, b, (w - sz2.Width) / 2f, 160);
+                g.DrawString("YunX-Desktop-fork", subFont, b, (w - sz2.Width) / 2f, 160);
 
             // 流光进度条：轨道 + 两端羽化的移动高亮段
             int trackW = 200, trackH = 4, trackY = 202;

@@ -74,7 +74,7 @@ fun main(args: Array<String>) {
                 if (w != null) WindowFx.fadeOutThen(w) { exitApplication() }
                 else exitApplication()
             },
-            title = "云析 YunX-Desktop-Fork",
+            title = "云析 YunX-Desktop-fork",
             state = WindowState(size = DpSize(1100.dp, 760.dp)),
             icon = remember { loadWindowIcon() },
         ) {

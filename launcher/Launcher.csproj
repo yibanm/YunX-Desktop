@@ -8,8 +8,8 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <Optimize>true</Optimize>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <Win32Icon>../repo/YunX-Desktop.ico</Win32Icon>
-    <Version>1.1.3</Version>
+    <Win32Icon>../YunX-Desktop.ico</Win32Icon>
+    <Version>1.1.4</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,7 +17,7 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
-    <Compile Include="../repo/launcher/Launcher.cs" />
+    <Compile Include="Launcher.cs" />
   </ItemGroup>
 
 </Project>
