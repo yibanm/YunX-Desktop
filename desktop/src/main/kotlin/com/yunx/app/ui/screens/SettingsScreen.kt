@@ -499,7 +499,7 @@ fun SettingsScreen(
         SettingsItem(
             icon = Icons.Outlined.VolunteerActivism,
             title = "支持开发",
-            description = "微信扫码捐赠，支持项目持续维护",
+            description = "查看作者信息，去GitHub点个star支持项目",
             onClick = onSupportClick
         )
     }

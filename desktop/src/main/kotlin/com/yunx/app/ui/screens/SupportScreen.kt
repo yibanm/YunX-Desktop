@@ -1,7 +1,6 @@
 package com.yunx.app.ui.screens
 
 import com.yunx.app.ui.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material3.Button
@@ -36,11 +34,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,8 +45,8 @@ import com.yunx.app.ui.SnackbarController
 import com.yunx.app.util.DesktopActions
 
 /**
- * 支持开发页：展示赞助信息与开源仓库入口。
- * Material3 风格：渐变头部 + 卡片展示赞助说明 + 作者致谢 + 开源仓库按钮。
+ * 支持开发页：展示作者信息与开源仓库入口。
+ * Material3 风格：渐变头部 + 作者卡片 + 开源仓库按钮。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +54,6 @@ fun SupportScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 系统返回键 → 返回设置页
     BackHandler { onBack() }
 
     Scaffold(
@@ -134,63 +129,6 @@ fun SupportScreen(
                 }
             }
 
-            // ---------- 赞助信息卡片 ----------
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Outlined.Favorite,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "扫码支持",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 两个二维码并排展示
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally)
-                    ) {
-                        RewardCodeCard(
-                            imageRes = "reward_author.jpg",
-                            title = "原作者 CYQawa",
-                            subtitle = "微信赞赏码"
-                        )
-                        RewardCodeCard(
-                            imageRes = "reward_user.png",
-                            title = "维护者 richkobe",
-                            subtitle = "微信赞赏码"
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "你的每一份支持，都是持续维护与更新的动力",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
             // ---------- 作者致谢 ----------
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -239,7 +177,7 @@ fun SupportScreen(
                 }
             }
 
-            // ---------- 免责说明（委婉） ----------
+            // ---------- 说明 ----------
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
@@ -262,7 +200,7 @@ fun SupportScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "云析完全免费开源，所有功能无需捐赠即可正常使用。" +
-                            "如果你觉得它帮到了你，愿意的话可以扫码表达一下心意，" +
+                            "如果你觉得它帮到了你，欢迎去 GitHub 点个 star，" +
                             "你的支持会成为持续维护与更新的动力～",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -341,59 +279,3 @@ private fun AuthorCard(
         }
     }
 }
-
-/** 二维码卡片：资源缺失时降级为占位，避免图片缺失导致崩溃 */
-@Composable
-private fun RewardCodeCard(
-    imageRes: String,
-    title: String,
-    subtitle: String
-) {
-    // 非组合上下文判断资源是否存在；存在时才在组合态调用 painterResource
-    val exists = remember(imageRes) { resourceExists(imageRes) }
-    val painter = if (exists) painterResource(imageRes) else null
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(200.dp)
-    ) {
-        Surface(
-            modifier = Modifier.size(200.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest
-        ) {
-            if (painter != null) {
-                Image(
-                    painter = painter,
-                    contentDescription = title,
-                    modifier = Modifier.padding(8.dp)
-                )
-            } else {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "赞赏码",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-/** 判断 classpath 根目录下是否存在指定资源（非组合上下文，供 remember 调用） */
-private fun resourceExists(name: String): Boolean = runCatching {
-    Thread.currentThread().contextClassLoader?.getResource(name) != null
-}.getOrDefault(false)
