@@ -32,6 +32,8 @@ namespace YunXDesktop
         [STAThread]
         static int Main(string[] args)
         {
+            // 必须在任何窗口创建之前设置 AppUserModelID，否则任务栏右键菜单缺少固定/结束任务
+            try { SetCurrentProcessExplicitAppUserModelID("YunX-Desktop-fork"); } catch { }
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
 
@@ -226,6 +228,7 @@ namespace YunXDesktop
         // ---- Win32 ----
         delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
+        [DllImport("shell32.dll")] static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
         [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
         [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
         [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
@@ -265,13 +268,15 @@ namespace YunXDesktop
             BackColor = Color.FromArgb(27, 28, 31);
             Opacity = 0;
 
-            string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "YunX-Desktop.ico");
-            try { appIcon = new Icon(icoPath, 96, 96); }
-            catch
+            // 优先从嵌入资源加载图标（高质量），失败则从 exe 关联图标提取
+            appIcon = LoadEmbeddedIcon();
+            if (appIcon == null)
             {
                 try { appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
                 catch { appIcon = null; }
             }
+            // 设置窗体图标，确保任务栏/Alt+Tab 显示正确图标
+            if (appIcon != null) this.Icon = appIcon;
 
             // 单一动画时钟：驱动渐显（easeOutCubic）与进度条相位
             anim.Interval = 16;
@@ -399,6 +404,27 @@ namespace YunXDesktop
             {
                 try { Close(); } catch { }
             }
+        }
+
+        /// 从程序集嵌入资源加载图标（优先大尺寸 96x96）
+        static Icon LoadEmbeddedIcon()
+        {
+            try
+            {
+                var asm = typeof(SplashForm).Assembly;
+                foreach (var name in asm.GetManifestResourceNames())
+                {
+                    if (name.EndsWith(".ico", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var stream = asm.GetManifestResourceStream(name))
+                        {
+                            if (stream != null) return new Icon(stream, new Size(96, 96));
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
 
         [DllImport("dwmapi.dll")]

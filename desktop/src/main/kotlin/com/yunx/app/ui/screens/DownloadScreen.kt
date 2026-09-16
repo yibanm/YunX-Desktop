@@ -687,8 +687,12 @@ private fun DownloadSubTaskRow(
                     Column {
                         TextButton(onClick = {
                             showMenu = false
-                            DesktopActions.copyToClipboard(task.url)
-                            SnackbarController.show("分享链接已复制")
+                            if (task.shareUrl.isNotBlank()) {
+                                DesktopActions.copyToClipboard(task.shareUrl)
+                                SnackbarController.show("分享链接已复制")
+                            } else {
+                                SnackbarController.show("获取分享链接失败")
+                            }
                         }) {
                             Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -907,8 +911,12 @@ private fun DownloadTaskCard(
                     Column {
                         TextButton(onClick = {
                             showMenu = false
-                            DesktopActions.copyToClipboard(task.url)
-                            SnackbarController.show("分享链接已复制")
+                            if (task.shareUrl.isNotBlank()) {
+                                DesktopActions.copyToClipboard(task.shareUrl)
+                                SnackbarController.show("分享链接已复制")
+                            } else {
+                                SnackbarController.show("获取分享链接失败")
+                            }
                         }) {
                             Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))

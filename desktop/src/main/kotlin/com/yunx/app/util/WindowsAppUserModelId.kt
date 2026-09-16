@@ -14,11 +14,14 @@ object WindowsAppUserModelId {
         if (!System.getProperty("os.name").contains("Windows", true)) return
         runCatching {
             val shell32 = Native.load("shell32", Shell32::class.java)
-            shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+            val hr = shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+            println("[AUMID] SetCurrentProcessExplicitAppUserModelID($APP_ID) hr=$hr")
+        }.onFailure {
+            println("[AUMID] Failed: ${it.message}")
         }
     }
 
     private interface Shell32 : StdCallLibrary {
-        fun SetCurrentProcessExplicitAppUserModelID(appId: String)
+        fun SetCurrentProcessExplicitAppUserModelID(appId: String): Int
     }
 }

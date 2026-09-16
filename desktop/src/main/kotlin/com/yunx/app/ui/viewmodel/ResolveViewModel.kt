@@ -520,6 +520,8 @@ class ResolveViewModel(
     fun startResolve(link: String, pwd: String?) {
         currentLink = link
         currentPwd = pwd
+        // 记录当前分享链接，供下载任务"复制分享链接"使用
+        downloadManager.currentShareUrl = link
         viewModelScope.launch {
             uiState = ResolveUiState.Loading
             val parsed = ShareLinkParser.parse(link)

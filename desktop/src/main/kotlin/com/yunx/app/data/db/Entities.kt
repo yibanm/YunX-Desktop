@@ -79,6 +79,8 @@ data class DownloadTaskEntity(
     val cleanupId: String = "",
     /** 下载来源平台标识（用于按平台应用下载线程数设置）；通用/手动添加为空串 */
     val platform: String = "",
+    /** 原始分享链接（如 https://pan.baidu.com/s/xxx），用于右键"复制分享链接" */
+    val shareUrl: String = "",
     /** 下载完成时的平均速度（字节/秒）；完成态展示用，进行中为 0 */
     val avgSpeed: Long = 0,
     val createTime: Long = System.currentTimeMillis()

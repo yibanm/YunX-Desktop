@@ -266,6 +266,9 @@ class DownloadManager(
 
     val tasks: Flow<List<DownloadTaskEntity>> = dao.observeAll()
 
+    /** 当前正在浏览的分享链接（由解析页/网盘页设置），入队时自动记录到任务 */
+    @Volatile var currentShareUrl: String = ""
+
     /** 入队并立即开始下载 */
     suspend fun enqueue(
         url: String,
@@ -275,6 +278,8 @@ class DownloadManager(
         size: Long = -1L,
         /** 下载来源平台标识（按平台应用下载线程数设置）；通用/手动添加传空串 */
         platform: String = "",
+        /** 原始分享链接；为空时自动取 currentShareUrl */
+        shareUrl: String = "",
         /** 下载成功完成后的清理回调（如删除网盘临时转存文件）；失败/取消不触发 */
         onComplete: suspend () -> Unit = {}
     ): Long {
@@ -283,13 +288,15 @@ class DownloadManager(
             url.substringAfterLast('/').substringBefore('?')
                 .ifBlank { "download_${System.currentTimeMillis()}" }
         }
-        Log.d(TAG, "enqueue: origin=${LogRedactor.url(url)} fileName=$safeName headers=${headers.keys} size=$size")
+        val effectiveShareUrl = shareUrl.ifBlank { currentShareUrl }
+        Log.d(TAG, "enqueue: origin=${LogRedactor.url(url)} fileName=$safeName headers=${headers.keys} size=$size shareUrl=$effectiveShareUrl")
         val id = dao.insert(
             DownloadTaskEntity(
                 url = url,
                 fileName = safeName,
                 requestHeadersJson = encodeHeaders(headers),
-                platform = platform
+                platform = platform,
+                shareUrl = effectiveShareUrl
             )
         )
         // 保存请求头（Cookie/UA），暂停后恢复仍需携带

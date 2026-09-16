@@ -18,6 +18,7 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <Compile Include="Launcher.cs" />
+    <EmbeddedResource Include="../YunX-Desktop.ico" />
   </ItemGroup>
 
 </Project>

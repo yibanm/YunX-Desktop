@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -265,35 +266,42 @@ fun SettingsScreen(
             },
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // 打开缓存目录
-                    IconButton(onClick = {
-                        val ok = DesktopActions.openFile(AppContext.cacheDir.absolutePath)
-                        if (!ok) SnackbarController.show("缓存目录不存在")
-                    }) {
+                    // 打开缓存目录（图标+文字合并为一个按钮）
+                    Button(
+                        onClick = {
+                            val ok = DesktopActions.openFile(AppContext.cacheDir.absolutePath)
+                            if (!ok) SnackbarController.show("缓存目录不存在")
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
                         Icon(
                             Icons.Outlined.FolderOpen,
-                            contentDescription = "打开缓存目录",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("打开文件夹", fontSize = 11.sp)
                     }
-                    Text(
-                        text = "打开文件夹",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    // 删除缓存（二次确认）
-                    IconButton(onClick = { showClearCacheConfirm = true }) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    // 删除缓存（图标+文字合并为一个按钮，红色）
+                    Button(
+                        onClick = { showClearCacheConfirm = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
                         Icon(
                             Icons.Outlined.Delete,
-                            contentDescription = "清除缓存",
-                            tint = MaterialTheme.colorScheme.error
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("删除缓存", fontSize = 11.sp)
                     }
-                    Text(
-                        text = "删除缓存",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.error
-                    )
                     if (cachePath != null) {
                         TextButton(
                             onClick = {
@@ -705,6 +713,15 @@ fun SettingsScreen(
                 threadPlatforms.forEach { item ->
                     val current = settingsRepo.downloadThreadsFor(item.platform)
                     val isXunlei = item.platform == DownloadPlatform.XUNLEI
+                    val recommended = when (item.platform) {
+                        DownloadPlatform.QUARK -> 16
+                        DownloadPlatform.UC -> 16
+                        DownloadPlatform.C139 -> 16
+                        DownloadPlatform.PAN123 -> 16
+                        DownloadPlatform.XUNLEI -> 8
+                        DownloadPlatform.BAIDU -> 8
+                        else -> 16
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -720,15 +737,22 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.weight(1f)
                         )
-                        Text(
-                            text = if (isXunlei) "固定 8 线程" else "$current 线程",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isXunlei) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            }
-                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = if (isXunlei) "固定 8 线程" else "$current 线程",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isXunlei) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
+                            )
+                            Text(
+                                text = "推荐 $recommended 线程",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         if (!isXunlei) {
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
