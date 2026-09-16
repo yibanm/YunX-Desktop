@@ -14,7 +14,7 @@ OutFile "..\release\YunX-Desktop-setup-${APP_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\YunX-Desktop"
 InstallDirRegKey HKCU "${UNINST_KEY}" "InstallLocation"
 RequestExecutionLevel user
-SetCompressor /SOLID lzma
+SetCompressor bzip2
 Icon "..\YunX-Desktop.ico"
 UninstallIcon "..\YunX-Desktop.ico"
 

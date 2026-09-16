@@ -70,6 +70,7 @@ import com.yunx.app.data.repository.UCAccountRepository
 import com.yunx.app.data.repository.UCResolveRepository
 import com.yunx.app.data.repository.XunleiAccountRepository
 import com.yunx.app.data.repository.XunleiResolveRepository
+import com.yunx.app.data.update.UpdateChecker
 import com.yunx.app.ui.components.OverlayDialogHost
 import com.yunx.app.ui.clipboard.ClipboardLinkController
 import com.yunx.app.ui.clipboard.ClipboardLinkDetector
@@ -91,6 +92,7 @@ import com.yunx.app.ui.screens.ResolveScreen
 import com.yunx.app.ui.screens.SettingsScreen
 import com.yunx.app.ui.screens.SupportScreen
 import com.yunx.app.ui.screens.ThemeScreen
+import com.yunx.app.ui.screens.UpdateDialog
 import com.yunx.app.ui.viewmodel.BaiduAccountViewModel
 import com.yunx.app.ui.viewmodel.BaiduCloudViewModel
 import com.yunx.app.ui.viewmodel.BookmarkViewModel
@@ -107,6 +109,7 @@ import com.yunx.app.ui.viewmodel.UCAccountViewModel
 import com.yunx.app.ui.viewmodel.UCCoudViewModel
 import com.yunx.app.ui.viewmodel.XunleiAccountViewModel
 import com.yunx.app.ui.viewmodel.XunleiCloudViewModel
+import com.yunx.app.util.DesktopActions
 import kotlinx.coroutines.launch
 
 /**
@@ -141,6 +144,18 @@ fun MainScreen() {
     var showOnboarding by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         showOnboarding = !AppContext.miscPrefs.getBoolean("onboarding_shown", false)
+    }
+
+    // 启动后自动检查更新（延迟 6 秒，不影响启动性能）
+    var autoUpdateRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(6000)
+        val ignored = AppContext.miscPrefs.get("update_ignored_version", "")
+        val release = runCatching { UpdateChecker.fetchLatestRelease() }.getOrNull() ?: return@LaunchedEffect
+        val current = UpdateChecker.currentVersion()
+        if (UpdateChecker.compareVersions(release.tagName, current) > 0 && release.tagName != ignored) {
+            autoUpdateRelease = release
+        }
     }
 
     // 依赖装配（与 Android 版相同的对象图，去掉 Android 专属注入）
@@ -337,6 +352,23 @@ fun MainScreen() {
     // 必须放在全屏覆盖层 return 之前，保证任何页面状态下监听都在运行。
     ClipboardLinkDetector()
     ClipboardLinkPopup()
+
+    // 启动自动检查更新弹窗
+    autoUpdateRelease?.let { release ->
+        UpdateDialog(
+            currentVersion = UpdateChecker.currentVersion(),
+            release = release,
+            onDownload = {
+                DesktopActions.openUrl(release.htmlUrl)
+                autoUpdateRelease = null
+            },
+            onLater = { autoUpdateRelease = null },
+            onIgnore = {
+                AppContext.miscPrefs.put("update_ignored_version", release.tagName)
+                autoUpdateRelease = null
+            }
+        )
+    }
     // 弹窗点击「打开」：切到解析页并解析，同时把主窗口置前
     val clipboardOpenRequest = ClipboardLinkController.openRequest
     LaunchedEffect(clipboardOpenRequest) {

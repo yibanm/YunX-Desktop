@@ -574,15 +574,13 @@ class BaiduCloudViewModel(
     /** 下拉刷新 */
     fun refresh() {
         val current = uiState.value
-        if (current !is BaiduCloudUiState.Loaded) {
-            loadRoot()
-            return
-        }
+        val dirPath = (current as? BaiduCloudUiState.Loaded)?.dirPath ?: "/"
+        val pathNames = (current as? BaiduCloudUiState.Loaded)?.pathNames ?: emptyList()
         refreshing = true
         viewModelScope.launch {
             try {
-                val files = api.listCloudFiles(current.dirPath, cookie())
-                _uiState.value = BaiduCloudUiState.Loaded(files, current.pathNames, current.dirPath)
+                val files = api.listCloudFiles(dirPath, cookie())
+                _uiState.value = BaiduCloudUiState.Loaded(files, pathNames, dirPath)
             } catch (e: Exception) {
                 cloudMessage = e.message ?: "刷新失败"
             } finally {
@@ -603,12 +601,19 @@ class BaiduCloudViewModel(
     private fun load(dirPath: String, pathNames: List<String>) {
         _uiState.value = BaiduCloudUiState.Loading
         viewModelScope.launch {
-            try {
-                val files = api.listCloudFiles(dirPath, cookie())
-                _uiState.value = BaiduCloudUiState.Loaded(files, pathNames, dirPath)
-            } catch (e: Exception) {
-                _uiState.value = BaiduCloudUiState.Error(e.message ?: "加载失败")
+            var lastError: Exception? = null
+            // 首次加载自动重试 2 次：网盘接口偶发限流/登录态未就绪，重试比让用户手动点更稳
+            repeat(2) { attempt ->
+                try {
+                    val files = api.listCloudFiles(dirPath, cookie())
+                    _uiState.value = BaiduCloudUiState.Loaded(files, pathNames, dirPath)
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    if (attempt < 1) kotlinx.coroutines.delay(500)
+                }
             }
+            _uiState.value = BaiduCloudUiState.Error(lastError?.message ?: "加载失败")
         }
     }
 

@@ -615,14 +615,29 @@ private fun DownloadSubTaskRow(
                             tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)
                         )
                     }
-                    DownloadTaskEntity.STATUS_COMPLETED -> IconButton(
-                        onClick = { openSavedFile(task.savePath) },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.OpenInNew, contentDescription = "打开",
-                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)
-                        )
+                    DownloadTaskEntity.STATUS_COMPLETED -> Row {
+                        IconButton(
+                            onClick = {
+                                if (!DesktopActions.revealFile(task.savePath)) {
+                                    SnackbarController.show("无法定位文件位置")
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Folder, contentDescription = "打开文件夹",
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { openSavedFile(task.savePath) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.OpenInNew, contentDescription = "打开",
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
                 // 删除
@@ -780,6 +795,13 @@ private fun DownloadTaskCard(
                         Icon(Icons.Outlined.Refresh, contentDescription = "重试", tint = MaterialTheme.colorScheme.error)
                     }
                                         DownloadTaskEntity.STATUS_COMPLETED -> Row {
+                        IconButton(onClick = {
+                            if (!DesktopActions.revealFile(task.savePath)) {
+                                SnackbarController.show("无法定位文件位置")
+                            }
+                        }) {
+                            Icon(Icons.Outlined.Folder, contentDescription = "打开文件夹", tint = MaterialTheme.colorScheme.primary)
+                        }
                         IconButton(onClick = {
                             openSavedFile(task.savePath)
                         }) {

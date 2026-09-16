@@ -590,20 +590,19 @@ class XunleiCloudViewModel(
     /** 下拉刷新 */
     fun refresh() {
         val current = uiState.value
-        if (current !is XunleiCloudUiState.Loaded) {
-            loadRoot()
-            return
-        }
+        val dirFid = (current as? XunleiCloudUiState.Loaded)?.dirFid ?: ""
+        val pathNames = (current as? XunleiCloudUiState.Loaded)?.pathNames ?: emptyList()
         refreshing = true
         viewModelScope.launch {
             val c = creds()
             if (c == null) {
                 refreshing = false
+                cloudMessage = "请先登录迅雷网盘"
                 return@launch
             }
             try {
-                val files = api.getFiles(current.dirFid, c.first, c.second, c.third) ?: emptyList()
-                _uiState.value = XunleiCloudUiState.Loaded(files, current.pathNames, current.dirFid)
+                val files = api.getFiles(dirFid, c.first, c.second, c.third) ?: emptyList()
+                _uiState.value = XunleiCloudUiState.Loaded(files, pathNames, dirFid)
             } catch (e: Exception) {
                 cloudMessage = e.message ?: "刷新失败"
             } finally {
@@ -629,12 +628,18 @@ class XunleiCloudViewModel(
                 _uiState.value = XunleiCloudUiState.Error("请先登录迅雷网盘")
                 return@launch
             }
-            try {
-                val files = api.getFiles(dirFid, c.first, c.second, c.third) ?: emptyList()
-                _uiState.value = XunleiCloudUiState.Loaded(files, pathNames, dirFid)
-            } catch (e: Exception) {
-                _uiState.value = XunleiCloudUiState.Error(e.message ?: "加载失败")
+            var lastError: Exception? = null
+            repeat(2) { attempt ->
+                try {
+                    val files = api.getFiles(dirFid, c.first, c.second, c.third) ?: emptyList()
+                    _uiState.value = XunleiCloudUiState.Loaded(files, pathNames, dirFid)
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    if (attempt < 1) kotlinx.coroutines.delay(500)
+                }
             }
+            _uiState.value = XunleiCloudUiState.Error(lastError?.message ?: "加载失败")
         }
     }
 

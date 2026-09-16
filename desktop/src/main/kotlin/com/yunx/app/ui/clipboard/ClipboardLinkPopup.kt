@@ -1,5 +1,6 @@
 package com.yunx.app.ui.clipboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
@@ -205,11 +206,17 @@ fun ClipboardLinkPopup() {
                 modifier = Modifier.fillMaxSize()
             ) {
                 Column(
-                    modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 第一行：云朵图标 + 标题/链接 + 关闭按钮
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Surface(
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(36.dp),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
@@ -217,39 +224,47 @@ fun ClipboardLinkPopup() {
                                 Icon(
                                     imageVector = Icons.Outlined.Cloud,
                                     contentDescription = null,
-                                    modifier = Modifier.size(22.dp),
+                                    modifier = Modifier.size(20.dp),
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "发现${ClipboardLinkController.platformName(detection.parsed.platform)}网盘分享链接",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = detection.text.trim().replace("\n", " ").take(48),
+                                text = detection.text.trim().replace("\n", " ").take(50),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        IconButton(
-                            onClick = { ClipboardLinkController.dismiss() },
-                            modifier = Modifier.size(30.dp)
+                        // 关闭按钮：缩小点击区域，避免 48dp 默认最小尺寸撑高布局
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable { ClipboardLinkController.dismiss() },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Close,
                                 contentDescription = "关闭",
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.weight(1f))
+                    // 底部按钮行：始终贴底右对齐，与窗口宽度协调
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -258,7 +273,7 @@ fun ClipboardLinkPopup() {
                         TextButton(onClick = { ClipboardLinkController.dismiss() }) {
                             Text("忽略")
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Button(onClick = { ClipboardLinkController.open() }) {
                             Text("打开")
                         }

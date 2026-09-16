@@ -565,15 +565,13 @@ class C139CloudViewModel(
     /** 下拉刷新 */
     fun refresh() {
         val current = uiState.value
-        if (current !is C139CloudUiState.Loaded) {
-            loadRoot()
-            return
-        }
+        val dirId = (current as? C139CloudUiState.Loaded)?.dirId ?: "0"
+        val pathNames = (current as? C139CloudUiState.Loaded)?.pathNames ?: emptyList()
         refreshing = true
         viewModelScope.launch {
             try {
-                val files = api.listCloudFiles(current.dirId, cookie()).first
-                _uiState.value = C139CloudUiState.Loaded(files, current.pathNames, current.dirId)
+                val files = api.listCloudFiles(dirId, cookie()).first
+                _uiState.value = C139CloudUiState.Loaded(files, pathNames, dirId)
             } catch (e: Exception) {
                 cloudMessage = e.message ?: "刷新失败"
             } finally {
@@ -594,12 +592,18 @@ class C139CloudViewModel(
     private fun load(dirId: String, pathNames: List<String>) {
         _uiState.value = C139CloudUiState.Loading
         viewModelScope.launch {
-            try {
-                val files = api.listCloudFiles(dirId, cookie()).first
-                _uiState.value = C139CloudUiState.Loaded(files, pathNames, dirId)
-            } catch (e: Exception) {
-                _uiState.value = C139CloudUiState.Error(e.message ?: "加载失败")
+            var lastError: Exception? = null
+            repeat(2) { attempt ->
+                try {
+                    val files = api.listCloudFiles(dirId, cookie()).first
+                    _uiState.value = C139CloudUiState.Loaded(files, pathNames, dirId)
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    if (attempt < 1) kotlinx.coroutines.delay(500)
+                }
             }
+            _uiState.value = C139CloudUiState.Error(lastError?.message ?: "加载失败")
         }
     }
 
