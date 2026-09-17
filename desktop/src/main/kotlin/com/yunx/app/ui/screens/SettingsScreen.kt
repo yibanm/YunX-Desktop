@@ -892,7 +892,12 @@ fun SettingsScreen(
         onDismissRequest = { if (!isWebDavBusy) showWebDavDialog = false },
         title = { Text("WebDAV 备份与同步") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 // 服务器预设一键填充
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WebDavBackupManager.PRESETS.forEach { (name, url) ->
