@@ -8,7 +8,7 @@ import com.sun.jna.win32.StdCallLibrary
  * 必须在窗口创建之前调用。
  */
 object WindowsAppUserModelId {
-    private val APP_ID = "YunX-Desktop-Fork"
+    private val APP_ID = "YunX-Desktop-fork"
 
     fun init() {
         if (!System.getProperty("os.name").contains("Windows", true)) return
