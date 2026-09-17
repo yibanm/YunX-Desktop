@@ -209,10 +209,10 @@ class BaiduCloudViewModel(
 
     // ---------- 单文件操作 ----------
 
-    /** 百度下载直链的请求头（locatedownload 需 Cookie + netdisk UA） */
+    /** 百度下载直链的请求头（locatedownload 需 Cookie + 网页 UA） */
     private fun downloadHeaders(cookie: String): Map<String, String> = mapOf(
         "Cookie" to cookie,
-        "User-Agent" to BaiduConstants.UA_NETDISK
+        "User-Agent" to BaiduConstants.UA_WEB
     )
 
     /**
@@ -313,7 +313,7 @@ class BaiduCloudViewModel(
                     size = file.fsize,
                     headers = mapOf(
                         "Cookie" to cookie(),
-                        "User-Agent" to BaiduConstants.UA_NETDISK
+                        "User-Agent" to BaiduConstants.UA_WEB
                     )
                 )
                 downloadLink = link // 弹下载确认弹窗（长按直链可复制）

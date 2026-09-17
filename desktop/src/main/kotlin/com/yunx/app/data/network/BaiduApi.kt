@@ -365,7 +365,7 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
     /** 列出个人网盘目录，返回 ShareFile（fid=fs_id，fidToken=绝对路径 path） */
     suspend fun listCloudFiles(dir: String, cookie: String): List<ShareFile> = withContext(Dispatchers.IO) {
         val url = "https://pan.baidu.com/api/list?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
-            "&web=1&order=time&desc=1&dir=" + URLEncoder.encode(dir, "UTF-8") + "&num=100&page=1"
+            "&web=1&channel=chunlei&order=time&desc=1&dir=" + URLEncoder.encode(dir, "UTF-8") + "&num=100&page=1"
         val request = Request.Builder()
             .url(url)
             .header("Cookie", cookie)

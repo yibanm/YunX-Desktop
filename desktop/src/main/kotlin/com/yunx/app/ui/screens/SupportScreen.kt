@@ -147,7 +147,7 @@ fun SupportScreen(
                 )
                 RewardCard(
                     imageRes = "reward_user.png",
-                    title = "维护者 richkobe",
+                    title = "win端Fork作者 richkobe",
                     subtitle = "微信赞赏码"
                 )
             }

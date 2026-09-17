@@ -162,6 +162,8 @@ fun SettingsScreen(
 
     // WebDAV 备份弹窗
     var showWebDavDialog by remember { mutableStateOf(false) }
+    // 本地备份弹窗
+    var showLocalBackupDialog by remember { mutableStateOf(false) }
     var webdavServer by remember { mutableStateOf("") }
     var webdavUser by remember { mutableStateOf("") }
     var webdavPassword by remember { mutableStateOf("") }
@@ -487,38 +489,9 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
         SettingsItem(
             icon = Icons.Outlined.Save,
-            title = "本地备份导出",
-            description = "导出为 JSON 文件到本地",
-            onClick = {
-                scope.launch {
-                    val options = WebDavBackupManager.BackupOptions(
-                        includeFavorites = true,
-                        includeLinkHistory = true,
-                        includeDownloadRecords = true,
-                        includeAuth = false
-                    )
-                    val json = withContext(Dispatchers.IO) {
-                        runCatching { webDavManager.buildBackupJson(options) }.getOrNull()
-                    }
-                    if (json == null) {
-                        SnackbarController.show("导出失败")
-                        return@launch
-                    }
-                    val target = DesktopActions.saveFile(
-                        defaultName = "yunx_backup.json",
-                        title = "导出本地备份",
-                        filters = listOf("云析备份 (*.json)" to "*.json", "所有文件 (*.*)" to "*.*"),
-                        defaultExtension = "json"
-                    ) ?: return@launch
-                    val saved = withContext(Dispatchers.IO) {
-                        runCatching {
-                            java.io.File(target).writeText(json, Charsets.UTF_8)
-                            true
-                        }.getOrDefault(false)
-                    }
-                    SnackbarController.show(if (saved) "已导出到 ${java.io.File(target).parent}" else "导出失败")
-                }
-            }
+            title = "本地备份",
+            description = "备份到本地目录，支持定时备份和还原",
+            onClick = { showLocalBackupDialog = true }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -973,32 +946,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("本地定时：", style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { localIntervalMenuExpanded = true }) {
-                        Text(webdavIntervalLabel(localInterval))
-                    }
-                    DropdownMenu(
-                        expanded = localIntervalMenuExpanded,
-                        onDismissRequest = { localIntervalMenuExpanded = false }
-                    ) {
-                        listOf(
-                            0 to "关闭",
-                            1 to "每小时",
-                            24 to "每天",
-                            168 to "每周"
-                        ).forEach { (hours, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    localInterval = hours
-                                    settingsRepo.localBackupIntervalHours = hours
-                                    localIntervalMenuExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
                 if (isWebDavBusy) {
                     Box(
                         modifier = Modifier.fillMaxWidth(),
@@ -1040,70 +987,135 @@ fun SettingsScreen(
             ) { Text("备份到 WebDAV") }
         },
         dismissButton = {
-            Row {
-                TextButton(
-                    onClick = {
-                        if (webdavServer.isBlank() || webdavUser.isBlank()) {
-                            SnackbarController.show("请填写服务器地址与用户名")
-                            return@TextButton
+            TextButton(
+                onClick = {
+                    if (webdavServer.isBlank() || webdavUser.isBlank()) {
+                        SnackbarController.show("请填写服务器地址与用户名")
+                        return@TextButton
+                    }
+                    settingsRepo.webdavServerUrl = webdavServer.trim()
+                    settingsRepo.webdavUsername = webdavUser.trim()
+                    settingsRepo.webdavPassword = webdavPassword
+                    val config = WebDavBackupManager.Config(webdavServer.trim(), webdavUser.trim(), webdavPassword)
+                    isWebDavBusy = true
+                    scope.launch {
+                        try {
+                            remoteBackups = withContext(Dispatchers.IO) { webDavManager.listBackups(config) }
+                            showRemoteBackups = true
+                        } catch (e: Exception) {
+                            SnackbarController.show("获取备份列表失败：${e.message}")
+                        } finally {
+                            isWebDavBusy = false
                         }
-                        settingsRepo.webdavServerUrl = webdavServer.trim()
-                        settingsRepo.webdavUsername = webdavUser.trim()
-                        settingsRepo.webdavPassword = webdavPassword
-                        val config = WebDavBackupManager.Config(webdavServer.trim(), webdavUser.trim(), webdavPassword)
-                        isWebDavBusy = true
-                        scope.launch {
-                            try {
-                                remoteBackups = withContext(Dispatchers.IO) { webDavManager.listBackups(config) }
-                                showRemoteBackups = true
-                            } catch (e: Exception) {
-                                SnackbarController.show("获取备份列表失败：${e.message}")
-                            } finally {
-                                isWebDavBusy = false
-                            }
-                        }
-                    },
-                    enabled = !isWebDavBusy
-                ) { Text("从 WebDAV 还原") }
-                TextButton(
-                    onClick = {
-                        val options = WebDavBackupManager.BackupOptions(
-                            includeFavorites = includeFavorites,
-                            includeLinkHistory = includeLinkHistory,
-                            includeDownloadRecords = includeDownloadRecords,
-                            includeAuth = includeAuth
+                    }
+                },
+                enabled = !isWebDavBusy
+            ) { Text("从 WebDAV 还原") }
+        }
+    )
+
+    // 本地备份弹窗
+    FadeAlertDialog(
+        visible = showLocalBackupDialog,
+        onDismissRequest = { if (!isWebDavBusy) showLocalBackupDialog = false },
+        title = { Text("本地备份") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "备份内容",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                BackupCheckboxRow(checked = includeFavorites, label = "收藏的网盘链接") { includeFavorites = it }
+                BackupCheckboxRow(checked = includeLinkHistory, label = "网盘解析历史") { includeLinkHistory = it }
+                BackupCheckboxRow(checked = includeDownloadRecords, label = "下载记录") { includeDownloadRecords = it }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = includeAuth, onCheckedChange = { includeAuth = it })
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("网盘认证", color = MaterialTheme.colorScheme.error)
+                        Text(
+                            text = "包含敏感数据，切勿随意分享",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
                         )
-                        isWebDavBusy = true
-                        scope.launch {
-                            try {
-                                val f = withContext(Dispatchers.IO) { webDavManager.backupLocal(options) }
-                                SnackbarController.show("已本地备份：${f.name}")
-                            } catch (e: Exception) {
-                                SnackbarController.show("本地备份失败：${e.message}")
-                            } finally {
-                                isWebDavBusy = false
-                            }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("定时备份：", style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { localIntervalMenuExpanded = true }) {
+                        Text(webdavIntervalLabel(localInterval))
+                    }
+                    DropdownMenu(
+                        expanded = localIntervalMenuExpanded,
+                        onDismissRequest = { localIntervalMenuExpanded = false }
+                    ) {
+                        listOf(
+                            0 to "关闭",
+                            1 to "每小时",
+                            24 to "每天",
+                            168 to "每周"
+                        ).forEach { (hours, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    localInterval = hours
+                                    settingsRepo.localBackupIntervalHours = hours
+                                    localIntervalMenuExpanded = false
+                                }
+                            )
                         }
-                    },
-                    enabled = !isWebDavBusy
-                ) { Text("本地备份") }
-                TextButton(
-                    onClick = {
-                        isWebDavBusy = true
-                        scope.launch {
-                            try {
-                                localBackups = withContext(Dispatchers.IO) { webDavManager.listLocalBackups() }
-                                showLocalBackups = true
-                            } catch (e: Exception) {
-                                SnackbarController.show("获取本地备份失败：${e.message}")
-                            } finally {
-                                isWebDavBusy = false
-                            }
-                        }
-                    },
-                    enabled = !isWebDavBusy
-                ) { Text("本地还原") }
+                    }
+                }
+                if (isWebDavBusy) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
+                }
             }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val options = WebDavBackupManager.BackupOptions(
+                        includeFavorites = includeFavorites,
+                        includeLinkHistory = includeLinkHistory,
+                        includeDownloadRecords = includeDownloadRecords,
+                        includeAuth = includeAuth
+                    )
+                    isWebDavBusy = true
+                    scope.launch {
+                        try {
+                            val f = withContext(Dispatchers.IO) { webDavManager.backupLocal(options) }
+                            SnackbarController.show("已本地备份：${f.name}")
+                        } catch (e: Exception) {
+                            SnackbarController.show("本地备份失败：${e.message}")
+                        } finally {
+                            isWebDavBusy = false
+                        }
+                    }
+                },
+                enabled = !isWebDavBusy
+            ) { Text("立即备份") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    isWebDavBusy = true
+                    scope.launch {
+                        try {
+                            localBackups = withContext(Dispatchers.IO) { webDavManager.listLocalBackups() }
+                            showLocalBackups = true
+                        } catch (e: Exception) {
+                            SnackbarController.show("获取本地备份失败：${e.message}")
+                        } finally {
+                            isWebDavBusy = false
+                        }
+                    }
+                },
+                enabled = !isWebDavBusy
+            ) { Text("还原备份") }
         }
     )
 
