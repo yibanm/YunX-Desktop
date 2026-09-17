@@ -257,7 +257,8 @@ fun SettingsScreen(
         SettingsItem(
             icon = Icons.Outlined.FolderOpen,
             title = "下载缓存位置",
-            description = "点击自定义目录",
+            description = cachePath?.let { "已自定义：$it（点击修改）" }
+                ?: "默认 ${AppContext.cacheDir.absolutePath}（点击自定义）",
             onClick = {
                 scope.launch {
                     val dir = withContext(Dispatchers.IO) { DesktopActions.pickDirectory() }
@@ -689,12 +690,12 @@ fun SettingsScreen(
                     val current = settingsRepo.downloadThreadsFor(item.platform)
                     val isXunlei = item.platform == DownloadPlatform.XUNLEI
                     val recommended = when (item.platform) {
-                        DownloadPlatform.QUARK -> 16
-                        DownloadPlatform.UC -> 16
+                        DownloadPlatform.QUARK -> 32
+                        DownloadPlatform.UC -> 32
                         DownloadPlatform.C139 -> 16
                         DownloadPlatform.PAN123 -> 16
                         DownloadPlatform.XUNLEI -> 8
-                        DownloadPlatform.BAIDU -> 8
+                        DownloadPlatform.BAIDU -> 16
                         else -> 16
                     }
                     Row(

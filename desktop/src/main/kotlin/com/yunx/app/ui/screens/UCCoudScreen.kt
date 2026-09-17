@@ -230,7 +230,11 @@ fun UCCoudScreen(
                                             )
                                         }
                                         IconButton(onClick = { viewModel.refresh() }, enabled = !viewModel.refreshing) {
-                                            Icon(Icons.Outlined.Refresh, contentDescription = "刷新")
+                                            if (viewModel.refreshing) {
+                                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                            } else {
+                                                Icon(Icons.Outlined.Refresh, contentDescription = "刷新")
+                                            }
                                         }
                                     }
                                 }

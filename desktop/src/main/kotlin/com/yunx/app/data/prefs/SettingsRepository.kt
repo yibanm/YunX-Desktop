@@ -177,12 +177,14 @@ class SettingsRepository {
         const val DEFAULT_MAX_CONCURRENT_DOWNLOADS = 1
         const val DEFAULT_DOWNLOAD_RETRY_COUNT = 3
 
-        /** 各网盘默认下载线程数（用户未单独设置时使用；迅雷固定 8 走 RANGE_WORKERS_CAP） */
+        /** 各网盘默认下载线程数（用户未单独设置时使用；迅雷固定 8 走 RANGE_WORKERS_CAP）。
+         *  依据分块下载实测：单连接限速的阿里系 CDN（夸克/UC）并发越高越快取 32；
+         *  移动/123 中等并发取 16；百度非会员按账号限速且过高触发 errno=8888，取 16。 */
         val DEFAULT_THREADS_BY_PLATFORM: Map<String, Int> = mapOf(
-            DownloadPlatform.QUARK to 16,
-            DownloadPlatform.UC to 16,
+            DownloadPlatform.QUARK to 32,
+            DownloadPlatform.UC to 32,
             DownloadPlatform.XUNLEI to 8,
-            DownloadPlatform.BAIDU to 8,
+            DownloadPlatform.BAIDU to 16,
             DownloadPlatform.C139 to 16,
             DownloadPlatform.PAN123 to 16
         )

@@ -21,9 +21,10 @@ class BaiduAccountRepository(
 
     suspend fun getAccount(): BaiduAccountEntity? = dao.getAccount()
 
-    /** 退出登录：清理 JCEF Cookie + 清除本地记录 */
+    /** 退出登录：清理 JCEF Cookie + 清除本地记录 + 清空 bdstoken 缓存 */
     suspend fun logoutBaidu() {
         CookieCleaner.clearCookiesForDomains(listOf("pan.baidu.com", "yun.baidu.com", "baidu.com"))
+        api.clearSessionCache()
         dao.clear()
     }
 
@@ -32,6 +33,7 @@ class BaiduAccountRepository(
      */
     suspend fun saveBaiduAccount(cookie: String): Boolean {
         if (!BaiduConstants.isValidCookie(cookie)) return false
+        api.clearSessionCache()
         val nickname = api.fetchNickname(cookie) ?: "百度用户"
         dao.upsert(
             BaiduAccountEntity(

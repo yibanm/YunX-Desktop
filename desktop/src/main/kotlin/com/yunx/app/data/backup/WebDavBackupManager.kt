@@ -55,11 +55,13 @@ class WebDavBackupManager {
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 60_000
 
-        /** 服务器预设（UI 代理会用这些预设填充按钮） */
-        val PRESETS: Map<String, String> = mapOf(
+        /** 服务器预设（一键填充地址，用户名密码仍需自行填写） */
+        val PRESETS: LinkedHashMap<String, String> = linkedMapOf(
             "坚果云" to "https://dav.jianguoyun.com/dav/",
             "infini-cloud" to "https://wajima.infini-cloud.net/dav/",
-            "Terabox" to "https://dav.terabox.com/dav/"
+            "Terabox" to "https://dav.terabox.com/dav/",
+            "Koofr" to "https://app.koofr.net/dav/Koofr",
+            "4shared" to "https://webdav.4shared.com/"
         )
     }
 
