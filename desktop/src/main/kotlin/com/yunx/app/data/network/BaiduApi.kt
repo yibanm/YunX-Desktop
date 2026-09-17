@@ -199,12 +199,13 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
 
     /** 列出个人网盘目录（检查临时转存目录是否存在），返回子项 path 集合 */
     suspend fun listDir(dir: String, cookie: String): List<String> = withContext(Dispatchers.IO) {
-        val url = "https://yun.baidu.com/api/list?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
+        val url = "https://pan.baidu.com/api/list?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
             "&web=1&order=time&desc=1&dir=" + URLEncoder.encode(dir, "UTF-8") + "&num=100&page=1"
         val request = Request.Builder()
             .url(url)
             .header("Cookie", cookie)
-            .header("User-Agent", BaiduConstants.UA_NETDISK)
+            .header("User-Agent", BaiduConstants.UA_WEB)
+            .header("Referer", "https://pan.baidu.com/disk/main")
             .get()
             .build()
         runCatching {
@@ -363,14 +364,14 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
 
     /** 列出个人网盘目录，返回 ShareFile（fid=fs_id，fidToken=绝对路径 path） */
     suspend fun listCloudFiles(dir: String, cookie: String): List<ShareFile> = withContext(Dispatchers.IO) {
-        val url = "https://yun.baidu.com/api/list?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
+        val url = "https://pan.baidu.com/api/list?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
             "&web=1&order=time&desc=1&dir=" + URLEncoder.encode(dir, "UTF-8") + "&num=100&page=1"
         val request = Request.Builder()
             .url(url)
             .header("Cookie", cookie)
-            .header("User-Agent", BaiduConstants.UA_NETDISK)
+            .header("User-Agent", BaiduConstants.UA_WEB)
             .header("X-Requested-With", "XMLHttpRequest")
-            .header("Referer", "https://yun.baidu.com/disk/main")
+            .header("Referer", "https://pan.baidu.com/disk/main")
             .get()
             .build()
         runCatching {
@@ -508,17 +509,17 @@ suspend fun listShare(surl: String, sekey: String, dir: String, cookie: String, 
 
     // ---------- 网盘空间详情 ----------
 
-    /** 网盘空间详情（GET yun.baidu.com/api/quota：total / used） */
+    /** 网盘空间详情（GET pan.baidu.com/api/quota：total / used） */
     suspend fun getQuota(cookie: String): QuotaInfo? = withContext(Dispatchers.IO) {
-        val url = "https://yun.baidu.com/api/quota?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
+        val url = "https://pan.baidu.com/api/quota?clienttype=0&app_id=${BaiduConstants.APP_ID}" +
             "&web=1&channel=chunlei&version=${System.currentTimeMillis()}"
         runCatching {
             val request = Request.Builder()
                 .url(url)
                 .header("Cookie", cookie)
-                .header("User-Agent", BaiduConstants.UA_NETDISK)
+                .header("User-Agent", BaiduConstants.UA_WEB)
                 .header("X-Requested-With", "XMLHttpRequest")
-                .header("Referer", "https://yun.baidu.com/disk/main")
+                .header("Referer", "https://pan.baidu.com/disk/main")
                 .get()
                 .build()
             val response = client.newCall(request).execute()
