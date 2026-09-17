@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -191,6 +194,7 @@ private fun DialogSurface(
             Column(
                 modifier = Modifier
                     .widthIn(min = 280.dp, max = 560.dp)
+                    .heightIn(max = 720.dp)
                     .padding(24.dp)
             ) {
                 icon?.let {
@@ -204,7 +208,14 @@ private fun DialogSurface(
                 title?.let {
                     Box(modifier = Modifier.padding(bottom = 16.dp)) { it() }
                 }
-                text?.invoke()
+                // text 区域填充剩余空间，超长内容在内部滚动，按钮固定在底部
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    text?.invoke()
+                }
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
