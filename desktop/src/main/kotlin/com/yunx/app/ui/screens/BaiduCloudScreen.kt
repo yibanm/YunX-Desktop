@@ -230,8 +230,10 @@ fun BaiduCloudScreen(
                                                 Text(if (viewModel.selected.size == s.files.size) "取消全选" else "全选")
                                             }
                                         } else {
-                                            IconButton(onClick = onExit) {
-                                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                                            IconButton(onClick = {
+                                                if (s.pathNames.isNotEmpty()) viewModel.back() else onExit()
+                                            }) {
+                                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回上一级")
                                             }
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
