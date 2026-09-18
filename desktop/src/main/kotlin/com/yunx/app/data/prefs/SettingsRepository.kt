@@ -48,6 +48,13 @@ class SettingsRepository {
             if (value.isNullOrBlank()) prefs.remove("download_cache_dir") else prefs.put("download_cache_dir", value)
         }
 
+    /** 自定义本地备份目录；null/空 = 默认 文档/YunX-Desktop */
+    var localBackupDir: String?
+        get() = prefs.get("local_backup_dir", null)
+        set(value) {
+            if (value.isNullOrBlank()) prefs.remove("local_backup_dir") else prefs.put("local_backup_dir", value)
+        }
+
     /** 最大同时下载任务数（默认 1：前台任务吃满带宽，其余排队） */
     var maxConcurrentDownloads: Int
         get() = prefs.getInt("max_concurrent_downloads", DEFAULT_MAX_CONCURRENT_DOWNLOADS)

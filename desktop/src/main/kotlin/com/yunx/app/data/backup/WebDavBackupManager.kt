@@ -366,10 +366,16 @@ class WebDavBackupManager {
         return out.toByteArray()
     }
 
-    /** 本地备份目录：AppContext.dataDir/YunX/ */
-    internal fun localDir(): File = File(AppContext.dataDir, "YunX").apply { mkdirs() }
+    /**
+     * 本地备份目录：默认「文档/YunX-Desktop」，可在设置页自定义（[com.yunx.app.AppContext.backupDir]）。
+     * WebDAV 远端仍固定放在服务器的 YunX/ 目录下。
+     */
+    internal fun localDir(): File = AppContext.backupDir.apply { mkdirs() }
 
-    // ---------- 本地备份（与 WebDAV 对齐，存放在 AppContext.dataDir/YunX/） ----------
+    /** 当前本地备份目录的绝对路径（设置页展示与"打开文件夹"用） */
+    fun localDirPath(): String = localDir().absolutePath
+
+    // ---------- 本地备份（与 WebDAV 对齐，默认存放在 文档/YunX-Desktop/） ----------
 
     /** 备份到本地：在 dataDir/YunX/ 下保存带时间戳的 json 文件，返回文件 */
     suspend fun backupLocal(options: BackupOptions): File = withContext(Dispatchers.IO) {

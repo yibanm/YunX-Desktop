@@ -64,7 +64,11 @@ object HttpClients {
                     timeUnit = TimeUnit.MINUTES
                 )
             )
-            .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+            // 关键：分片下载强制 HTTP/1.1。HTTP/2 会把同一主机的所有请求多路复用到一条 TCP
+            // 连接上，导致 N 个线程共享一条连接的拥塞窗口与服务端单连接限速，多线程形同虚设
+            // （表现为线程调多也不提速、刚开快随后掉速）。HTTP/1.1 下每个分片独立 TCP 连接，
+            // 各自吃一份单连接带宽，这也是 IDM/aria2 多线程下载的通用做法。
+            .protocols(listOf(Protocol.HTTP_1_1))
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)

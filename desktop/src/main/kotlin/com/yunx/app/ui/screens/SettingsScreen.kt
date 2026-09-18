@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Layers
@@ -46,6 +47,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -159,6 +161,13 @@ fun SettingsScreen(
     LaunchedEffect(cachePath) { AppContext.customCacheDir = cachePath }
     // 清除缓存二次确认
     var showClearCacheConfirm by remember { mutableStateOf(false) }
+
+    // 本地备份目录：默认 文档/YunX-Desktop，可自定义
+    var localBackupPath by remember { mutableStateOf(settingsRepo.localBackupDir) }
+    LaunchedEffect(localBackupPath) {
+        AppContext.customBackupDir = localBackupPath
+        settingsRepo.localBackupDir = localBackupPath
+    }
 
     // WebDAV 备份弹窗
     var showWebDavDialog by remember { mutableStateOf(false) }
@@ -1022,6 +1031,46 @@ fun SettingsScreen(
         title = { Text("本地备份") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // 备份目录：默认 文档/YunX-Desktop，可自定义、可打开
+                val backupPathDisplay = localBackupPath ?: AppContext.backupDir.absolutePath
+                Text(
+                    text = "备份目录",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = backupPathDisplay,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = {
+                        scope.launch {
+                            val dir = withContext(Dispatchers.IO) { DesktopActions.pickDirectory() }
+                            if (!dir.isNullOrBlank()) {
+                                localBackupPath = dir
+                                SnackbarController.show("备份目录已更新")
+                            }
+                        }
+                    }) { Text("选择", fontSize = 12.sp) }
+                    TextButton(onClick = {
+                        val ok = DesktopActions.openFile(backupPathDisplay)
+                        if (!ok) SnackbarController.show("无法打开备份目录")
+                    }) {
+                        Icon(Icons.Outlined.FolderOpen, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("打开", fontSize = 12.sp)
+                    }
+                    if (localBackupPath != null) {
+                        TextButton(onClick = { localBackupPath = null }) {
+                            Text("默认", fontSize = 12.sp)
+                        }
+                    }
+                }
+                HorizontalDivider()
                 Text(
                     text = "备份内容",
                     style = MaterialTheme.typography.labelMedium,
@@ -1161,6 +1210,10 @@ fun SettingsScreen(
                         isWebDavBusy = false
                     }
                 }
+            },
+            onOpenFolder = {
+                val ok = DesktopActions.openFile(webDavManager.localDirPath())
+                if (!ok) SnackbarController.show("无法打开备份目录")
             }
         )
     }
@@ -1468,7 +1521,8 @@ private fun RestoreBackupListDialog(
     title: String,
     backups: List<WebDavBackupManager.BackupFile>,
     onDismiss: () -> Unit,
-    onRestore: (String) -> Unit
+    onRestore: (String) -> Unit,
+    onOpenFolder: (() -> Unit)? = null
 ) {
     FadeAlertDialog(
         visible = true,
@@ -1487,8 +1541,9 @@ private fun RestoreBackupListDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
                                 .clickable { onRestore(b.name) }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -1504,6 +1559,12 @@ private fun RestoreBackupListDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            Icon(
+                                Icons.Outlined.Download,
+                                contentDescription = "还原",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }
@@ -1511,7 +1572,16 @@ private fun RestoreBackupListDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("关闭") }
-        }
+        },
+        dismissButton = if (onOpenFolder != null) {
+            {
+                TextButton(onClick = onOpenFolder) {
+                    Icon(Icons.Outlined.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("打开文件夹")
+                }
+            }
+        } else null
     )
 }
 

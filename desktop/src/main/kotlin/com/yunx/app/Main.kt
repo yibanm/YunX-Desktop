@@ -34,12 +34,13 @@ fun main(args: Array<String>) {
     // Windows AppUserModelID：必须在窗口创建前设置，任务栏右键才显示"固定到任务栏/结束任务"
     com.yunx.app.util.WindowsAppUserModelId.init()
 
+    // 注入设置页配置的自定义目录（缓存、本地备份）；为空则用默认，需在 AppContext.init 前设置
+    SettingsRepository().let { settings ->
+        settings.downloadCacheDir?.let { AppContext.customCacheDir = it }
+        settings.localBackupDir?.let { AppContext.customBackupDir = it }
+    }
     // 桌面上下文初始化（数据目录等）
     AppContext.init()
-    // 应用自定义缓存目录（设置页配置的下载缓存位置；为空则用默认 ~/.yunx-pc/cache）
-    SettingsRepository().downloadCacheDir?.let {
-        AppContext.customCacheDir = it
-    }
     // 迅雷设备指纹（进程启动时初始化一次，等价原 Application.onCreate）
     XunleiDeviceFingerprint.init()
 
