@@ -5,19 +5,20 @@ import com.yunx.app.data.db.AppDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLDecoder
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.Base64
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * WebDAV 通用备份：把收藏 / 解析历史 / 下载记录 / 网盘认证 打包为 JSON，
@@ -246,12 +247,31 @@ class WebDavBackupManager {
         restored
     }
 
-    // ---------- 极简 WebDAV HTTP 客户端（Basic 认证） ----------
+    // ---------- 极简 WebDAV HTTP 客户端（OkHttp，Basic 认证） ----------
+    // 注意：JDK 的 HttpURLConnection 只允许 GET/POST/HEAD/OPTIONS/PUT/DELETE/TRACE，
+    // 对 MKCOL/PROPFIND 会直接抛 ProtocolException("Invalid HTTP method")，因此必须走 OkHttp。
 
-    private fun buildUrl(config: Config, path: String): URL {
+    private val jsonMedia = "application/json; charset=utf-8".toMediaType()
+    private val xmlMedia = "application/xml; charset=utf-8".toMediaType()
+    private val propfindBody =
+        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+            "<D:propfind xmlns:D=\"DAV:\"><D:allprop/></D:propfind>")
+            .toByteArray(StandardCharsets.UTF_8)
+            .toRequestBody(xmlMedia)
+
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .writeTimeout(READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+    }
+
+    private fun buildUrl(config: Config, path: String): String {
         val base = config.serverUrl.trimEnd('/')
         val p = if (path.startsWith("/")) path else "/$path"
-        return URL("$base$p")
+        return "$base$p"
     }
 
     private fun authHeader(config: Config): String {
@@ -259,49 +279,67 @@ class WebDavBackupManager {
         return "Basic " + Base64.getEncoder().encodeToString(raw.toByteArray(StandardCharsets.UTF_8))
     }
 
-    /** 确保 YunX/ 目录存在：PROPFIND 检查，404 则 MKCOL 创建 */
+    /** 统一执行：加 Basic 认证头，返回 HTTP 状态码与响应字节（错误响应同样读取）。 */
+    private fun execute(config: Config, builder: Request.Builder): Pair<Int, ByteArray> {
+        val req = builder.header("Authorization", authHeader(config)).build()
+        httpClient.newCall(req).execute().use { resp ->
+            val bytes = resp.body?.bytes() ?: ByteArray(0)
+            return resp.code to bytes
+        }
+    }
+
+    /** 确保 YunX/ 目录存在：PROPFIND 探测，404/网络失败则 MKCOL 创建，其余状态码视为配置错误直接抛出。 */
     private fun ensureAppDir(config: Config) {
-        val exists = runCatching {
-            propfind(config, APP_DIR, depth = "0")
-            true
-        }.getOrDefault(false)
-        if (!exists) {
+        val probe = runCatching {
+            execute(
+                config,
+                Request.Builder().url(buildUrl(config, APP_DIR))
+                    .method("PROPFIND", propfindBody).header("Depth", "0")
+            )
+        }.getOrNull()
+        val probeCode = probe?.first ?: -1
+        if (probeCode in 200..299) return
+        if (probeCode == 404 || probeCode == -1) {
             mkcol(config, APP_DIR)
+        } else {
+            throw java.io.IOException("WebDAV 无法访问备份目录：HTTP $probeCode（请检查服务器地址、账号密码）")
         }
     }
 
     private fun mkcol(config: Config, path: String) {
-        val conn = buildUrl(config, path).openConnection() as HttpURLConnection
-        conn.requestMethod = "MKCOL"
-        conn.connectTimeout = CONNECT_TIMEOUT_MS
-        conn.readTimeout = READ_TIMEOUT_MS
-        conn.setRequestProperty("Authorization", authHeader(config))
-        val code = conn.responseCode
-        conn.disconnect()
-        // 201 Created / 405 (already exists) 都视为成功
-        if (code !in 200..299 && code != 405 && code != 409) {
-            throw java.io.IOException("WebDAV 创建目录失败：HTTP $code")
+        var (code, _) = execute(
+            config,
+            Request.Builder().url(buildUrl(config, path)).method("MKCOL", null)
+        )
+        // 201 Created / 405 Method Not Allowed（目录已存在）都算成功；
+        // 409 Conflict 多为父目录不存在，逐级补建父目录后重试一次。
+        if (code in 200..299 || code == 405) return
+        if (code == 409) {
+            val parent = path.substringBeforeLast('/', "")
+            if (parent.isNotBlank() && parent != path) {
+                mkcol(config, parent)
+                val retry = execute(
+                    config,
+                    Request.Builder().url(buildUrl(config, path)).method("MKCOL", null)
+                )
+                code = retry.first
+                if (code in 200..299 || code == 405) return
+            }
         }
+        throw java.io.IOException("WebDAV 创建目录失败：HTTP $code")
     }
 
     /** PROPFIND 列目录，返回响应 XML 字符串 */
     private fun propfind(config: Config, path: String, depth: String = "1"): String {
-        val conn = buildUrl(config, path).openConnection() as HttpURLConnection
-        conn.requestMethod = "PROPFIND"
-        conn.connectTimeout = CONNECT_TIMEOUT_MS
-        conn.readTimeout = READ_TIMEOUT_MS
-        conn.setRequestProperty("Authorization", authHeader(config))
-        conn.setRequestProperty("Depth", depth)
-        conn.setRequestProperty("Content-Type", "application/xml; charset=utf-8")
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val out = ByteArrayOutputStream()
-        stream?.use { it.copyTo(out) }
-        conn.disconnect()
+        val (code, bytes) = execute(
+            config,
+            Request.Builder().url(buildUrl(config, path))
+                .method("PROPFIND", propfindBody).header("Depth", depth)
+        )
         if (code !in 200..299) {
             throw java.io.IOException("WebDAV PROPFIND 失败：HTTP $code")
         }
-        return String(out.toByteArray(), StandardCharsets.UTF_8)
+        return String(bytes, StandardCharsets.UTF_8)
     }
 
     /** 用正则解析 PROPFIND multistatus XML，提取 href / getlastmodified / getcontentlength */
@@ -338,32 +376,20 @@ class WebDavBackupManager {
     }
 
     private fun put(config: Config, path: String, body: ByteArray) {
-        val conn = buildUrl(config, path).openConnection() as HttpURLConnection
-        conn.requestMethod = "PUT"
-        conn.connectTimeout = CONNECT_TIMEOUT_MS
-        conn.readTimeout = READ_TIMEOUT_MS
-        conn.doOutput = true
-        conn.setRequestProperty("Authorization", authHeader(config))
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        conn.outputStream.use { it.write(body) }
-        val code = conn.responseCode
-        conn.disconnect()
+        val (code, _) = execute(
+            config,
+            Request.Builder().url(buildUrl(config, path)).put(body.toRequestBody(jsonMedia))
+        )
         if (code !in 200..299) throw java.io.IOException("WebDAV 上传失败：HTTP $code")
     }
 
     private fun get(config: Config, path: String): ByteArray {
-        val conn = buildUrl(config, path).openConnection() as HttpURLConnection
-        conn.requestMethod = "GET"
-        conn.connectTimeout = CONNECT_TIMEOUT_MS
-        conn.readTimeout = READ_TIMEOUT_MS
-        conn.setRequestProperty("Authorization", authHeader(config))
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val out = ByteArrayOutputStream()
-        stream?.use { it.copyTo(out) }
-        conn.disconnect()
+        val (code, bytes) = execute(
+            config,
+            Request.Builder().url(buildUrl(config, path)).get()
+        )
         if (code !in 200..299) throw java.io.IOException("WebDAV 下载失败：HTTP $code")
-        return out.toByteArray()
+        return bytes
     }
 
     /**

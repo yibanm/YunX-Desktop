@@ -48,7 +48,7 @@ object UpdateChecker {
     }
 
     /** 当前应用版本号（桌面版固定常量，发布时随 packageVersion 同步更新） */
-    const val PC_VERSION = "1.1.4"
+    const val PC_VERSION = "1.1.5"
 
     fun currentVersion(): String = PC_VERSION
 

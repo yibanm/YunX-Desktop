@@ -13,13 +13,14 @@ SetCompressor /SOLID lzma
   !define ICON "..\..\YunX-Desktop.ico"
 !endif
 !ifndef OUTFILE
-  !define OUTFILE "..\..\release\YunX-Desktop-Fork-1.1.4-Setup.exe"
+  !define OUTFILE "..\..\release\YunX-Desktop-Fork-1.1.5-Setup.exe"
 !endif
 
-!define APPNAME   "云析 YunX-Desktop-fork"
-!define SHORTNAME "YunX"
-!define EXENAME   "YunX-Desktop-Fork.exe"
-!define AUMID     "YunX-Desktop-fork"
+!define APPNAME    "云析 YunX-Desktop-fork"
+!define SHORTNAME  "YunX"
+!define EXENAME    "YunX-Desktop-Fork.exe"
+!define AUMID      "YunX-Desktop-fork"
+!define APPVERSION "1.1.5"
 
 Name "${APPNAME}"
 OutFile "${OUTFILE}"
@@ -83,8 +84,11 @@ Section "Install"
   ; 添加/删除程序
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "DisplayName" "${APPNAME}"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "UninstallString" '"$INSTDIR\Uninstall.exe"'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "QuietUninstallString" '"$INSTDIR\Uninstall.exe" /S'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "DisplayIcon" '"$INSTDIR\${EXENAME}",0'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "DisplayVersion" "${APPVERSION}"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "Publisher" "YunX-Desktop-fork"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\YunX-Desktop-Fork" "NoRepair" 1
 SectionEnd
