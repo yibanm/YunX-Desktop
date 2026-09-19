@@ -87,27 +87,40 @@ class WebDavHttpVerbTest {
         assertEquals("PROPFIND", server.takeRequest().method)
     }
 
-    /** PROPFIND 404 后应发 MKCOL 创建目录，且不抛异常。 */
+    /** PROPFIND 404 后应发 MKCOL 创建目录，再 PROPFIND 复核，且不抛异常。 */
     @Test
     fun ensureAppDirCreatesWithMkcolWhenMissing() {
-        server.enqueue(MockResponse().setResponseCode(404))
-        server.enqueue(MockResponse().setResponseCode(201))
+        server.enqueue(MockResponse().setResponseCode(404))   // 初次探测：不存在
+        server.enqueue(MockResponse().setResponseCode(201))   // MKCOL 创建成功
+        server.enqueue(MockResponse().setResponseCode(207).setBody(propfindXml)) // 复核：存在
         invokeEnsureAppDir()
         assertEquals("PROPFIND", server.takeRequest().method)
         val mkcol = server.takeRequest()
         assertEquals("MKCOL", mkcol.method)
         assertTrue(mkcol.path!!.endsWith("/YunX"))
+        assertEquals("PROPFIND", server.takeRequest().method)
+    }
+
+    /** MKCOL 无权（403）且复核仍不存在时，应抛出错误而不是误判成功后继续 PUT。 */
+    @Test
+    fun ensureAppDirFailsWhenMkcolForbidden() {
+        server.enqueue(MockResponse().setResponseCode(404))   // 探测：不存在
+        server.enqueue(MockResponse().setResponseCode(403).setBody("forbidden")) // MKCOL 被拒
+        server.enqueue(MockResponse().setResponseCode(404))   // 复核：仍不存在
+        val error = runCatching { invokeEnsureAppDir() }.exceptionOrNull()
+        val real = (error?.cause ?: error)!!
+        assertTrue(real.message!!.contains("HTTP 403"))
     }
 
     /** 直接验证 MKCOL 动词能被 OkHttp 发出（旧实现此处抛 Invalid HTTP method）。 */
     @Test
     fun mkcolVerbIsAccepted() {
         server.enqueue(MockResponse().setResponseCode(201))
-        invokePrivate("mkcol", arrayOf(config, "YunX"))
+        invokePrivate("mkcolWithParents", arrayOf(config, "YunX"))
         assertEquals("MKCOL", server.takeRequest().method)
     }
 
-    /** PUT 上传需带 JSON body 且成功。 */
+    /** PUT 上传需带 JSON body、User-Agent，且成功。 */
     @Test
     fun putUploadsJsonBody() {
         server.enqueue(MockResponse().setResponseCode(201))
@@ -116,6 +129,20 @@ class WebDavHttpVerbTest {
         assertEquals("PUT", req.method)
         assertEquals("{}", req.body.readUtf8())
         assertTrue(req.getHeader("Content-Type")?.contains("application/json") == true)
+        assertTrue(req.getHeader("User-Agent")?.startsWith("YunX-Desktop") == true)
+    }
+
+    /** PUT 被拒（403）时，错误信息应带上可操作提示与服务器返回内容。 */
+    @Test
+    fun putForbiddenIncludesReason() {
+        server.enqueue(MockResponse().setResponseCode(403).setBody("<error>storageQuotaExceeded</error>"))
+        val error = runCatching {
+            invokePrivate("put", arrayOf(config, "YunX/test.json", "{}".toByteArray()))
+        }.exceptionOrNull()
+        val real = (error?.cause ?: error)!!
+        assertTrue(real.message!!.contains("HTTP 403"))
+        assertTrue(real.message!!.contains("应用密码") || real.message!!.contains("流量"))
+        assertTrue(real.message!!.contains("storageQuotaExceeded"))
     }
 
     /** GET 拉取备份内容。 */
@@ -130,23 +157,24 @@ class WebDavHttpVerbTest {
     /** 服务器返回 401 时应抛出带提示的异常，而不是静默成功。 */
     @Test
     fun ensureAppDirReportsAuthError() {
-        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setResponseCode(401))   // PROPFIND
+        server.enqueue(MockResponse().setResponseCode(401))   // MKCOL
         val error = runCatching { invokeEnsureAppDir() }.exceptionOrNull()
         // 反射调用会把目标异常包成 InvocationTargetException，取真实 cause
-        val real = error?.cause ?: error
-        assertTrue(real != null && real.message!!.contains("HTTP 401"))
+        val real = (error?.cause ?: error)!!
+        assertTrue(real.message!!.contains("HTTP 401"))
     }
 
     private fun invokeEnsureAppDir() {
         invokePrivate("ensureAppDir", arrayOf(config))
     }
 
-    /** 反射调用私有阻塞 HTTP 方法（mkcol/put/get/ensureAppDir）。 */
+    /** 反射调用私有阻塞 HTTP 方法（mkcolWithParents/put/get/ensureAppDir）。 */
     private fun invokePrivate(name: String, args: Array<Any?>): Any? {
         // 按实际参数个数与类型匹配
         val types = when (name) {
             "ensureAppDir" -> arrayOf(WebDavBackupManager.Config::class.java)
-            "mkcol" -> arrayOf(WebDavBackupManager.Config::class.java, String::class.java)
+            "mkcolWithParents" -> arrayOf(WebDavBackupManager.Config::class.java, String::class.java)
             "put" -> arrayOf(
                 WebDavBackupManager.Config::class.java,
                 String::class.java,

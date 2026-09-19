@@ -2,11 +2,13 @@ package com.yunx.app.data.backup
 
 import com.yunx.app.AppContext
 import com.yunx.app.data.db.AppDatabase
+import com.yunx.app.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
@@ -55,6 +57,8 @@ class WebDavBackupManager {
         const val APP_DIR = "YunX"
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 60_000
+        private const val TAG = "YunX-WebDAV"
+        private const val USER_AGENT = "YunX-Desktop-WebDAV/1.1.6"
 
         /** 服务器预设（一键填充地址，用户名密码仍需自行填写） */
         val PRESETS: LinkedHashMap<String, String> = linkedMapOf(
@@ -259,8 +263,11 @@ class WebDavBackupManager {
             .toByteArray(StandardCharsets.UTF_8)
             .toRequestBody(xmlMedia)
 
+    // WebDAV 是简单请求/响应协议，强制 HTTP/1.1：部分服务器（坚果云网关、部分 mod_dav）
+    // 对 HTTP/2 上的 PUT/MKCOL 兼容不佳，会返回 403；同时显式 User-Agent，避免被 WAF 拦截。
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .protocols(listOf(Protocol.HTTP_1_1))
             .connectTimeout(CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
             .writeTimeout(READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
@@ -279,66 +286,96 @@ class WebDavBackupManager {
         return "Basic " + Base64.getEncoder().encodeToString(raw.toByteArray(StandardCharsets.UTF_8))
     }
 
-    /** 统一执行：加 Basic 认证头，返回 HTTP 状态码与响应字节（错误响应同样读取）。 */
-    private fun execute(config: Config, builder: Request.Builder): Pair<Int, ByteArray> {
-        val req = builder.header("Authorization", authHeader(config)).build()
+    /** 统一执行：加 Basic 认证与 User-Agent，记录日志，返回 HTTP 状态码与响应字节（错误响应同样读取）。 */
+    private fun execute(config: Config, method: String, path: String, builder: Request.Builder): Pair<Int, ByteArray> {
+        val url = buildUrl(config, path)
+        val req = builder
+            .url(url)
+            .header("Authorization", authHeader(config))
+            .header("User-Agent", USER_AGENT)
+            .build()
         httpClient.newCall(req).execute().use { resp ->
             val bytes = resp.body?.bytes() ?: ByteArray(0)
+            // 401 体里可能带 WWW-Authenticate，不打印密码
+            Log.d(TAG, "$method ${config.serverUrl.trimEnd('/')}/$path -> ${resp.code} (${bytes.size}B)")
             return resp.code to bytes
         }
     }
 
-    /** 确保 YunX/ 目录存在：PROPFIND 探测，404/网络失败则 MKCOL 创建，其余状态码视为配置错误直接抛出。 */
-    private fun ensureAppDir(config: Config) {
-        val probe = runCatching {
+    /** 从错误响应体里提取一段纯文本，便于把服务器拒绝原因直接展示给用户。 */
+    private fun serverReason(bytes: ByteArray): String {
+        val plain = String(bytes, StandardCharsets.UTF_8)
+            .replace(Regex("<[^>]+>"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        return if (plain.isBlank()) "" else "；服务器返回：${plain.take(160)}"
+    }
+
+    /** 常见状态码的可操作提示。 */
+    private fun statusHint(code: Int): String = when (code) {
+        401 -> "账号或密码错误（坚果云等需使用「第三方应用密码」，不是登录密码）"
+        403 -> "无写入权限被拒绝：请确认使用的是第三方应用密码、账号已开启 WebDAV，且免费版上传流量未超限"
+        409 -> "上级目录不存在或存在同名文件"
+        507 -> "服务器存储空间不足"
+        else -> ""
+    }
+
+    private fun ioError(action: String, code: Int, bytes: ByteArray): java.io.IOException {
+        val hint = statusHint(code)
+        val tail = buildString {
+            if (hint.isNotBlank()) append("（$hint）")
+            append(serverReason(bytes))
+        }
+        Log.w(TAG, "$action 失败 HTTP $code $tail")
+        return java.io.IOException("WebDAV ${action}失败：HTTP $code$tail")
+    }
+
+    /** 目录是否存在（PROPFIND Depth:0），任何非 2xx 都视为不存在/不可访问。 */
+    private fun dirExists(config: Config, path: String): Boolean {
+        val (code, _) = runCatching {
             execute(
-                config,
-                Request.Builder().url(buildUrl(config, APP_DIR))
-                    .method("PROPFIND", propfindBody).header("Depth", "0")
+                config, "PROPFIND", path,
+                Request.Builder().method("PROPFIND", propfindBody).header("Depth", "0")
             )
-        }.getOrNull()
-        val probeCode = probe?.first ?: -1
-        if (probeCode in 200..299) return
-        if (probeCode == 404 || probeCode == -1) {
-            mkcol(config, APP_DIR)
-        } else {
-            throw java.io.IOException("WebDAV 无法访问备份目录：HTTP $probeCode（请检查服务器地址、账号密码）")
+        }.getOrNull() ?: return false
+        return code in 200..299
+    }
+
+    /**
+     * 确保 YunX/ 目录存在：
+     * PROPFIND 探测 -> 不存在则逐级 MKCOL -> 再 PROPFIND 复核，避免把"无权建目录"误判成成功。
+     */
+    private fun ensureAppDir(config: Config) {
+        if (dirExists(config, APP_DIR)) return
+        mkcolWithParents(config, APP_DIR)
+        if (!dirExists(config, APP_DIR)) {
+            throw java.io.IOException("WebDAV 备份目录 $APP_DIR 创建后仍无法访问，请检查该账号是否有写入权限")
         }
     }
 
-    private fun mkcol(config: Config, path: String) {
-        var (code, _) = execute(
-            config,
-            Request.Builder().url(buildUrl(config, path)).method("MKCOL", null)
-        )
-        // 201 Created / 405 Method Not Allowed（目录已存在）都算成功；
-        // 409 Conflict 多为父目录不存在，逐级补建父目录后重试一次。
+    /** 逐级创建目录（409 先建父目录）；201/405(已存在) 均可接受，其余状态码抛错。 */
+    private fun mkcolWithParents(config: Config, path: String) {
+        val (code, bytes) = execute(config, "MKCOL", path, Request.Builder().method("MKCOL", null))
         if (code in 200..299 || code == 405) return
         if (code == 409) {
             val parent = path.substringBeforeLast('/', "")
             if (parent.isNotBlank() && parent != path) {
-                mkcol(config, parent)
-                val retry = execute(
-                    config,
-                    Request.Builder().url(buildUrl(config, path)).method("MKCOL", null)
-                )
-                code = retry.first
-                if (code in 200..299 || code == 405) return
+                mkcolWithParents(config, parent)
+                val (code2, bytes2) = execute(config, "MKCOL", path, Request.Builder().method("MKCOL", null))
+                if (code2 in 200..299 || code2 == 405) return
+                throw ioError("创建目录", code2, bytes2)
             }
         }
-        throw java.io.IOException("WebDAV 创建目录失败：HTTP $code")
+        throw ioError("创建目录", code, bytes)
     }
 
     /** PROPFIND 列目录，返回响应 XML 字符串 */
     private fun propfind(config: Config, path: String, depth: String = "1"): String {
         val (code, bytes) = execute(
-            config,
-            Request.Builder().url(buildUrl(config, path))
-                .method("PROPFIND", propfindBody).header("Depth", depth)
+            config, "PROPFIND", path,
+            Request.Builder().method("PROPFIND", propfindBody).header("Depth", depth)
         )
-        if (code !in 200..299) {
-            throw java.io.IOException("WebDAV PROPFIND 失败：HTTP $code")
-        }
+        if (code !in 200..299) throw ioError("列目录", code, bytes)
         return String(bytes, StandardCharsets.UTF_8)
     }
 
@@ -376,19 +413,16 @@ class WebDavBackupManager {
     }
 
     private fun put(config: Config, path: String, body: ByteArray) {
-        val (code, _) = execute(
-            config,
-            Request.Builder().url(buildUrl(config, path)).put(body.toRequestBody(jsonMedia))
+        val (code, bytes) = execute(
+            config, "PUT", path,
+            Request.Builder().put(body.toRequestBody(jsonMedia))
         )
-        if (code !in 200..299) throw java.io.IOException("WebDAV 上传失败：HTTP $code")
+        if (code !in 200..299) throw ioError("上传", code, bytes)
     }
 
     private fun get(config: Config, path: String): ByteArray {
-        val (code, bytes) = execute(
-            config,
-            Request.Builder().url(buildUrl(config, path)).get()
-        )
-        if (code !in 200..299) throw java.io.IOException("WebDAV 下载失败：HTTP $code")
+        val (code, bytes) = execute(config, "GET", path, Request.Builder().get())
+        if (code !in 200..299) throw ioError("下载", code, bytes)
         return bytes
     }
 
